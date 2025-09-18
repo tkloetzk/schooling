@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -6,9 +6,12 @@ import {
   useNavigate,
   useLocation,
 } from "react-router-dom";
+import { useAppActions, useAppStore } from "./stores";
 import SessionScreen from "./components/SessionScreen";
 import StatsScreen from "./components/StatsScreen";
-import { useAppActions, useAppStore } from "./stores";
+import AdditionExerciseScreen from "./components/AdditionExerciseScreen";
+import SubtractionExerciseScreen from "./components/SubtractionExerciseScreen";
+import CountingExerciseScreen from "./components/CountingExerciseScreen";
 
 function App() {
   return (
@@ -18,6 +21,9 @@ function App() {
           <Route path="/" element={<StartScreen />} />
           <Route path="/session" element={<SessionScreen />} />
           <Route path="/stats" element={<StatsScreen />} />
+          <Route path="/addition" element={<AdditionExerciseScreen />} />
+          <Route path="/subtraction" element={<SubtractionExerciseScreen />} />
+          <Route path="/counting" element={<CountingExerciseScreen />} />
         </Routes>
       </div>
     </Router>
@@ -155,343 +161,282 @@ function StartScreen() {
             style={{
               fontSize: "2.5rem",
               marginBottom: "2rem",
-              color: "#1f2937",
+              color: "black",
             }}
           >
-            👶 Choose Your Child
+            Select Child
           </h2>
-
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "1rem",
-              marginBottom: "1.5rem",
+              display: "flex",
+              justifyContent: "space-around",
+              marginBottom: "2rem",
             }}
           >
             <button
               onClick={() => handleChildSelect("Everley")}
               style={{
-                padding: "1rem 0.75rem",
-                fontSize: "1.25rem",
-                fontWeight: "600",
+                padding: "1.5rem 1rem",
+                fontSize: "1.5rem",
+                fontWeight: "700",
                 background:
                   selectedChild === "Everley"
-                    ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                    : "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-                color: "white",
+                    ? "linear-gradient(135deg, #ec4899 0%, #db2777 100%)"
+                    : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
+                color: selectedChild === "Everley" ? "white" : "#6b7280",
                 border:
                   selectedChild === "Everley"
-                    ? "3px solid #059669"
-                    : "3px solid #2563eb",
-                borderRadius: "12px",
+                    ? "3px solid #db2777"
+                    : "3px solid #6b7280",
+                borderRadius: "16px",
                 cursor: "pointer",
-                boxShadow: "0 3px 10px rgba(0,0,0,0.08)",
                 transition: "all 300ms ease",
-                transform:
-                  selectedChild === "Everley" ? "scale(1.01)" : "scale(1)",
               }}
             >
-              <div style={{ fontSize: "2rem", marginBottom: "0.25rem" }}>
-                {selectedChild === "Everley" ? "👧✨" : "👧"}
-              </div>
-              <div>Everley</div>
-              {selectedChild === "Everley" && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "-6px",
-                    right: "-6px",
-                    background: "#10b981",
-                    borderRadius: "50%",
-                    width: "24px",
-                    height: "24px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "1.25rem",
-                    fontWeight: "bold",
-                  }}
-                >
-                  ✓
-                </div>
-              )}
+              Everley
             </button>
-
             <button
               onClick={() => handleChildSelect("Presley")}
               style={{
-                padding: "1rem 0.75rem",
-                fontSize: "1.25rem",
-                fontWeight: "600",
+                padding: "1.5rem 1rem",
+                fontSize: "1.5rem",
+                fontWeight: "700",
                 background:
                   selectedChild === "Presley"
-                    ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                    : "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-                color: "white",
+                    ? "linear-gradient(135deg, #ec4899 0%, #db2777 100%)"
+                    : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
+                color: selectedChild === "Presley" ? "white" : "#6b7280",
                 border:
                   selectedChild === "Presley"
-                    ? "3px solid #059669"
-                    : "3px solid #2563eb",
-                borderRadius: "12px",
+                    ? "3px solid #db2777"
+                    : "3px solid #6b7280",
+                borderRadius: "16px",
                 cursor: "pointer",
-                boxShadow: "0 3px 10px rgba(0,0,0,0.08)",
                 transition: "all 300ms ease",
-                transform:
-                  selectedChild === "Presley" ? "scale(1.01)" : "scale(1)",
               }}
             >
-              <div style={{ fontSize: "2rem", marginBottom: "0.25rem" }}>
-                {selectedChild === "Presley" ? "👧✨" : "👧"}
-              </div>
-              <div>Presley</div>
-              {selectedChild === "Presley" && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "-6px",
-                    right: "-6px",
-                    background: "#10b981",
-                    borderRadius: "50%",
-                    width: "24px",
-                    height: "24px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "1.25rem",
-                    fontWeight: "bold",
-                  }}
-                >
-                  ✓
-                </div>
-              )}
+              Presley
             </button>
           </div>
 
-          {selectedChild && (
-            <>
-              <div
+          <h2
+            style={{
+              fontSize: "2.5rem",
+              marginBottom: "2rem",
+              color: "black",
+            }}
+          >
+            Select Tier
+          </h2>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-around",
+              marginBottom: "2rem",
+            }}
+          >
+            <div
+              style={{
+                position: "relative",
+              }}
+            >
+              <button
+                onClick={() => handleTierSelect(1)}
+                disabled={!isTierUnlocked(1)}
                 style={{
-                  background:
-                    "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)",
-                  borderRadius: "24px",
-                  padding: "2rem",
-                  marginBottom: "2rem",
-                  border: "3px solid #3b82f6",
+                  padding: "1.5rem 1rem",
+                  fontSize: "1.5rem",
+                  fontWeight: "700",
+                  background: isTierUnlocked(1)
+                    ? selectedTier === 1
+                      ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                      : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)"
+                    : "linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)",
+                  color: isTierUnlocked(1) ? "white" : "#6b7280",
+                  border: isTierUnlocked(1)
+                    ? selectedTier === 1
+                      ? "3px solid #059669"
+                      : "3px solid #6b7280"
+                    : "3px solid #9ca3af",
+                  borderRadius: "16px",
+                  cursor: isTierUnlocked(1) ? "pointer" : "not-allowed",
+                  transition: "all 300ms ease",
                 }}
               >
-                <h3
+                ⭐ Tier 1 {isTierUnlocked(1) ? "" : "🔒"}
+              </button>
+              {!isTierUnlocked(1) && (
+                <div
                   style={{
-                    fontSize: "2rem",
-                    marginBottom: "1.5rem",
-                    color: "#1e40af",
-                    fontWeight: "700",
+                    position: "absolute",
+                    bottom: "100%",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    background: "rgba(0,0,0,0.8)",
+                    color: "white",
+                    padding: "0.5rem",
+                    borderRadius: "8px",
+                    fontSize: "0.9rem",
+                    marginBottom: "0.5rem",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  📚 Choose Your Level
-                </h3>
-
-                <div style={{ marginBottom: "1.5rem" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "1.5rem",
-                      fontWeight: "600",
-                      marginBottom: "1rem",
-                      color: "#1f2937",
-                    }}
-                  >
-                    📖 Practice Type:
-                  </label>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: "1rem",
-                    }}
-                  >
-                    <button
-                      onClick={() => setSelectedMode("words")}
-                      style={{
-                        padding: "1.5rem 1rem",
-                        fontSize: "1.5rem",
-                        fontWeight: "700",
-                        background:
-                          selectedMode === "words"
-                            ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                            : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
-                        color: "white",
-                        border:
-                          selectedMode === "words"
-                            ? "3px solid #059669"
-                            : "3px solid #6b7280",
-                        borderRadius: "16px",
-                        cursor: "pointer",
-                        transition: "all 300ms ease",
-                      }}
-                    >
-                      📝 Words
-                    </button>
-                    <button
-                      onClick={() => setSelectedMode("sentences")}
-                      style={{
-                        padding: "1.5rem 1rem",
-                        fontSize: "1.5rem",
-                        fontWeight: "700",
-                        background:
-                          selectedMode === "sentences"
-                            ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                            : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
-                        color: "white",
-                        border:
-                          selectedMode === "sentences"
-                            ? "3px solid #059669"
-                            : "3px solid #6b7280",
-                        borderRadius: "16px",
-                        cursor: "pointer",
-                        transition: "all 300ms ease",
-                      }}
-                    >
-                      💬 Sentences
-                    </button>
-                  </div>
+                  Complete Tier 1 first!
                 </div>
-
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "1.5rem",
-                      fontWeight: "600",
-                      marginBottom: "1rem",
-                      color: "#1f2937",
-                    }}
-                  >
-                    🏆 Difficulty Level:
-                  </label>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: "1rem",
-                    }}
-                  >
-                    <button
-                      onClick={() => handleTierSelect(1)}
-                      style={{
-                        padding: "1.5rem 1rem",
-                        fontSize: "1.5rem",
-                        fontWeight: "700",
-                        background:
-                          selectedTier === 1
-                            ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                            : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
-                        color: "white",
-                        border:
-                          selectedTier === 1
-                            ? "3px solid #059669"
-                            : "3px solid #6b7280",
-                        borderRadius: "16px",
-                        cursor: "pointer",
-                        transition: "all 300ms ease",
-                      }}
-                    >
-                      ⭐ Tier 1
-                    </button>
-                    <div style={{ position: "relative" }}>
-                      <button
-                        onClick={() => handleTierSelect(2)}
-                        disabled={!isTierUnlocked(2)}
-                        style={{
-                          padding: "1.5rem 1rem",
-                          fontSize: "1.5rem",
-                          fontWeight: "700",
-                          background: isTierUnlocked(2)
-                            ? selectedTier === 2
-                              ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                              : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)"
-                            : "linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)",
-                          color: isTierUnlocked(2) ? "white" : "#6b7280",
-                          border: isTierUnlocked(2)
-                            ? selectedTier === 2
-                              ? "3px solid #059669"
-                              : "3px solid #6b7280"
-                            : "3px solid #9ca3af",
-                          borderRadius: "16px",
-                          cursor: isTierUnlocked(2) ? "pointer" : "not-allowed",
-                          transition: "all 300ms ease",
-                        }}
-                      >
-                        ⭐⭐ Tier 2 {isTierUnlocked(2) ? "" : "🔒"}
-                      </button>
-                      {!isTierUnlocked(2) && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            bottom: "100%",
-                            left: "50%",
-                            transform: "translateX(-50%)",
-                            background: "rgba(0,0,0,0.8)",
-                            color: "white",
-                            padding: "0.5rem",
-                            borderRadius: "8px",
-                            fontSize: "0.9rem",
-                            marginBottom: "0.5rem",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          Complete Tier 1 first!
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
+              )}
+            </div>
+            <div
+              style={{
+                position: "relative",
+              }}
+            >
               <button
-                onClick={handleStartSession}
+                onClick={() => handleTierSelect(2)}
+                disabled={!isTierUnlocked(2)}
                 style={{
-                  width: "100%",
-                  padding: "2rem",
-                  fontSize: "2.5rem",
-                  fontWeight: "800",
-                  background:
-                    "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                  color: "white",
-                  border: "6px solid #d97706",
-                  borderRadius: "24px",
-                  cursor: "pointer",
-                  boxShadow: "0 12px 30px rgba(245,158,11,0.3)",
-                  transition: "all 300ms ease",
-                  marginBottom: "2rem",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.transform = "scale(1.02)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.transform = "scale(1)")
-                }
-              >
-                🚀 START {selectedMode.toUpperCase()} PRACTICE! 🚀
-              </button>
-
-              <div
-                style={{
-                  padding: "1.5rem",
+                  padding: "1.5rem 1rem",
                   fontSize: "1.5rem",
-                  color: "#059669",
-                  fontWeight: "600",
-                  background:
-                    "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)",
+                  fontWeight: "700",
+                  background: isTierUnlocked(2)
+                    ? selectedTier === 2
+                      ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                      : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)"
+                    : "linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)",
+                  color: isTierUnlocked(2) ? "white" : "#6b7280",
+                  border: isTierUnlocked(2)
+                    ? selectedTier === 2
+                      ? "3px solid #059669"
+                      : "3px solid #6b7280"
+                    : "3px solid #9ca3af",
                   borderRadius: "16px",
-                  border: "3px solid #059669",
+                  cursor: isTierUnlocked(2) ? "pointer" : "not-allowed",
+                  transition: "all 300ms ease",
                 }}
               >
-                🎉 Perfect choice, {selectedChild}!<br />
-                Ready for {selectedMode} practice? Let's go! 🚀
-              </div>
-            </>
-          )}
+                ⭐⭐ Tier 2 {isTierUnlocked(2) ? "" : "🔒"}
+              </button>
+              {!isTierUnlocked(2) && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: "100%",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    background: "rgba(0,0,0,0.8)",
+                    color: "white",
+                    padding: "0.5rem",
+                    borderRadius: "8px",
+                    fontSize: "0.9rem",
+                    marginBottom: "0.5rem",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Complete Tier 1 first!
+                </div>
+              )}
+            </div>
+          </div>
+
+          <h2
+            style={{
+              fontSize: "2.5rem",
+              marginBottom: "2rem",
+              color: "black",
+            }}
+          >
+            Select Mode
+          </h2>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-around",
+              marginBottom: "2rem",
+            }}
+          >
+            <button
+              onClick={() => setSelectedMode("words")}
+              style={{
+                padding: "1.5rem 1rem",
+                fontSize: "1.5rem",
+                fontWeight: "700",
+                background:
+                  selectedMode === "words"
+                    ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                    : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
+                color: selectedMode === "words" ? "white" : "#6b7280",
+                border:
+                  selectedMode === "words"
+                    ? "3px solid #059669"
+                    : "3px solid #6b7280",
+                borderRadius: "16px",
+                cursor: "pointer",
+                transition: "all 300ms ease",
+              }}
+            >
+              Words
+            </button>
+            <button
+              onClick={() => setSelectedMode("sentences")}
+              style={{
+                padding: "1.5rem 1rem",
+                fontSize: "1.5rem",
+                fontWeight: "700",
+                background:
+                  selectedMode === "sentences"
+                    ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                    : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
+                color: selectedMode === "sentences" ? "white" : "#6b7280",
+                border:
+                  selectedMode === "sentences"
+                    ? "3px solid #059669"
+                    : "3px solid #6b7280",
+                borderRadius: "16px",
+                cursor: "pointer",
+                transition: "all 300ms ease",
+              }}
+            >
+              Sentences
+            </button>
+          </div>
+
+          <button
+            onClick={handleStartSession}
+            style={{
+              width: "100%",
+              padding: "2rem",
+              fontSize: "2.5rem",
+              fontWeight: "800",
+              background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+              color: "white",
+              border: "6px solid #d97706",
+              borderRadius: "24px",
+              cursor: "pointer",
+              boxShadow: "0 12px 30px rgba(245,158,11,0.3)",
+              transition: "all 300ms ease",
+              marginBottom: "2rem",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.transform = "scale(1.02)")
+            }
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            🚀 START {selectedMode.toUpperCase()} PRACTICE! 🚀
+          </button>
+
+          <div
+            style={{
+              padding: "1.5rem",
+              fontSize: "1.5rem",
+              color: "#059669",
+              fontWeight: "600",
+              background: "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)",
+              borderRadius: "16px",
+              border: "3px solid #059669",
+            }}
+          >
+            🎉 Perfect choice, {selectedChild}!<br />
+            Ready for {selectedMode} practice? Let's go! 🚀
+          </div>
         </div>
       </div>
     </div>

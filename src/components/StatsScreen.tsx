@@ -995,7 +995,7 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
                       gap: "1rem",
                     }}
                   >
-                    {hardestItems.map((item, index) => (
+                    {hardestItems.map((item) => (
                       <div
                         key={item.id}
                         style={{

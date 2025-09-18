@@ -8,7 +8,7 @@ interface SessionScreenProps {}
 const SessionScreen: React.FC<SessionScreenProps> = () => {
   const navigate = useNavigate();
   const { selection, session } = useAppStore();
-  const { markAnswer, nextItem, setSession } = useAppActions();
+  const { markAnswer, nextItem } = useAppActions();
   const [currentItem, setCurrentItem] = useState<any>(null);
   const [lastAnswerStatus, setLastAnswerStatus] = useState<
     "correct" | "incorrect" | null

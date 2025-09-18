@@ -36,7 +36,7 @@ interface AppStoreState {
 }
 
 // Create the Zustand store
-export const useAppStore = create<AppStoreState>((set, get) => ({
+export const useAppStore = create<AppStoreState>(() => ({
   // Initial state
   selection: defaultSelection,
   session: defaultSession,
