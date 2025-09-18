@@ -1,5 +1,5 @@
 import Dexie, { Table } from "dexie";
-import { Item, Attempt, SeedData } from "../types";
+import { Item, Attempt, SeedData, Subject, Activity, Child, Tier } from "../types";
 import { seedData } from "../utils/seedData";
 
 // Database class extending Dexie
@@ -10,13 +10,36 @@ export class AppDatabase extends Dexie {
   constructor() {
     super("HighFrequencyWordsDB");
 
-    // Define schema
+    // v1: original schema
     this.version(1).stores({
       items:
         "++id, text, type, child, tier, box, seen, correct, incorrect, lastSeen, [child+tier], [child+tier+type], [child+tier+box], [child+lastSeen]",
       attempts:
         "++ts, child, tier, itemId, isSentence, correct, [child+tier], [child+tier+correct], [child+ts]",
     });
+
+    // v2: add subject + activity (non-breaking optional fields) & compound indexes including subject/activity for future queries
+    this.version(2)
+      .stores({
+        items:
+          "++id, text, type, subject, activity, child, tier, box, seen, correct, incorrect, lastSeen, [child+tier], [child+tier+type], [child+tier+box], [child+lastSeen], [child+subject+activity], [child+subject+activity+tier]",
+        attempts:
+          "++ts, child, tier, itemId, isSentence, correct, [child+tier], [child+tier+correct], [child+ts]",
+      })
+      .upgrade(async (tx) => {
+        const table = tx.table<Item>("items");
+        const all = await table.toArray();
+        for (const item of all) {
+          // Backfill legacy english items
+            if (!item.subject) {
+              (item as any).subject = "english" as Subject;
+            }
+            if (!item.activity) {
+              (item as any).activity = item.type === "word" ? "words" : item.type === "sentence" ? "sentences" : undefined;
+            }
+        }
+        await table.bulkPut(all);
+      });
   }
 }
 
@@ -32,6 +55,7 @@ export const dbUtils = {
       if (itemCount === 0) {
         console.log("Database is empty, seeding with initial data...");
         await seedDatabase();
+        await seedMathItems();
         console.log("✅ Database seeded successfully!");
       } else {
         console.log(`Database already has ${itemCount} items - skipping seed`);
@@ -57,8 +81,17 @@ export const dbUtils = {
   async getItemsForSession(
     child: string,
     tier: number,
-    type: string
+    type: string,
+    subject?: Subject,
+    activity?: Activity
   ): Promise<Item[]> {
+    // Prefer subject/activity query if provided
+    if (subject && activity) {
+      return await db.items
+        .where("[child+subject+activity+tier]")
+        .equals([child, subject, activity, tier])
+        .toArray();
+    }
     return await db.items
       .where("[child+tier+type]")
       .equals([child, tier, type])
@@ -93,16 +126,26 @@ export const dbUtils = {
     child: string,
     tier: number,
     type: string,
-    limit = 50
+    limit = 50,
+    subject?: Subject,
+    activity?: Activity
   ): Promise<Item[]> {
-    return await db.items
-      .where("[child+tier+type]")
-      .equals([child, tier, type])
-      .sortBy("box")
-      .then((items: Item[]) =>
-        items.sort((a: Item, b: Item) => a.lastSeen - b.lastSeen)
-      )
-      .then((items) => items.slice(0, limit));
+    let items: Item[];
+    if (subject && activity) {
+      items = await db.items
+        .where("[child+subject+activity+tier]")
+        .equals([child, subject, activity, tier])
+        .toArray();
+    } else {
+      items = await db.items
+        .where("[child+tier+type]")
+        .equals([child, tier, type])
+        .toArray();
+    }
+
+    return items
+      .sort((a, b) => a.box - b.box || a.lastSeen - b.lastSeen)
+      .slice(0, limit);
   },
 
   // Update item statistics after an attempt
@@ -226,13 +269,15 @@ async function seedDatabase(): Promise<void> {
           id: `${childName}-${tier}-word-${word.replace(/\s+/g, "-")}`,
           text: word,
           type: "word",
-          child: childName as any,
-          tier: tier as any,
+          child: childName as Child,
+          tier: tier as Tier,
           box: 1,
           seen: 0,
           correct: 0,
           incorrect: 0,
           lastSeen: 0,
+          subject: "english",
+          activity: "words",
         });
       }
 
@@ -244,13 +289,15 @@ async function seedDatabase(): Promise<void> {
             .substring(0, 20)}`,
           text: sentence,
           type: "sentence",
-          child: childName as any,
-          tier: tier as any,
+          child: childName as Child,
+          tier: tier as Tier,
           box: 1,
           seen: 0,
           correct: 0,
           incorrect: 0,
           lastSeen: 0,
+          subject: "english",
+          activity: "sentences",
         });
       }
     }
@@ -258,4 +305,53 @@ async function seedDatabase(): Promise<void> {
 
   await db.items.bulkAdd(items);
   console.log(`Seeded database with ${items.length} items`);
+}
+
+// Seed initial math placeholder items (used only for scheduling; problem content generated dynamically)
+async function seedMathItems(): Promise<void> {
+  const mathItems: Item[] = [];
+
+  const pushItem = (child: Child, tier: Tier, activity: Activity, index: number, label: string) => {
+    mathItems.push({
+      id: `${child}-${tier}-math-${activity}-${index}`,
+      text: label, // not displayed directly for generated problems
+      type: "math",
+      child,
+      tier,
+      box: 1,
+      seen: 0,
+      correct: 0,
+      incorrect: 0,
+      lastSeen: 0,
+      subject: "math",
+      activity,
+    });
+  };
+
+  // Addition 0-10 problems (roughly 36 unique pairs) for both children
+  for (let i = 0; i < 36; i++) {
+    pushItem("Everley", 1, "addition-0-10", i, `addition-${i}`);
+    pushItem("Presley", 1, "addition-0-10", i, `addition-${i}`);
+  }
+
+  // Counting by 2s & 5s for Presley (tier 1)
+  for (let i = 0; i < 20; i++) {
+    pushItem("Presley", 1, "counting-by-2s", i, `count2s-${i}`);
+    pushItem("Presley", 1, "counting-by-5s", i, `count5s-${i}`);
+  }
+
+  // Subtraction up to 10 for Presley (tier 2)
+  for (let i = 0; i < 30; i++) {
+    pushItem("Presley", 2, "subtraction-up-to-10", i, `sub-${i}`);
+  }
+
+  // Tens frame for Everley (tier 1)
+  for (let i = 0; i < 10; i++) {
+    pushItem("Everley", 1, "tens-frame", i, `tens-${i}`);
+  }
+
+  if (mathItems.length) {
+    await db.items.bulkAdd(mathItems);
+    console.log(`Seeded math items: ${mathItems.length}`);
+  }
 }

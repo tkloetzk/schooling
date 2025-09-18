@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { useAppActions, useAppStore } from "./stores";
 import SessionScreen from "./components/SessionScreen";
+import MathSessionScreen from "./components/MathSessionScreen";
 import StatsScreen from "./components/StatsScreen";
 import AdditionExerciseScreen from "./components/AdditionExerciseScreen";
 import SubtractionExerciseScreen from "./components/SubtractionExerciseScreen";
@@ -20,6 +21,7 @@ function App() {
         <Routes>
           <Route path="/" element={<StartScreen />} />
           <Route path="/session" element={<SessionScreen />} />
+          <Route path="/math-session" element={<MathSessionScreen />} />
           <Route path="/stats" element={<StatsScreen />} />
           <Route path="/addition" element={<AdditionExerciseScreen />} />
           <Route path="/subtraction" element={<SubtractionExerciseScreen />} />
@@ -49,17 +51,16 @@ function StartScreen() {
   const [selectedChild, setSelectedChild] = useState<
     "Everley" | "Presley" | null
   >(preservedSelections?.child || null);
-  const [selectedTier, setSelectedTier] = useState<1 | 2>(
-    preservedSelections?.tier || 1
-  );
-  const [selectedMode, setSelectedMode] = useState<"words" | "sentences">(
-    preservedSelections?.mode || "words"
-  );
+  const [selectedSubject, setSelectedSubject] = useState<"english" | "math">("english");
+  const [selectedTier, setSelectedTier] = useState<1 | 2>(preservedSelections?.tier || 1);
+  const [selectedMode, setSelectedMode] = useState<"words" | "sentences">(preservedSelections?.mode || "words");
+  const [selectedActivity, setSelectedActivity] = useState<string>("addition-0-10");
 
   const handleChildSelect = (child: "Everley" | "Presley") => {
     setSelectedChild(child);
-    setSelectedTier(1); // Reset to tier 1 when child changes
-    setSelectedMode("words"); // Reset to words when child changes
+  setSelectedTier(1);
+  setSelectedMode("words");
+  setSelectedSubject("english");
   };
 
   // Check if tier is unlocked for selected child
@@ -81,6 +82,8 @@ function StartScreen() {
         child: selectedChild,
         tier: selectedTier,
         mode: selectedMode,
+        subject: selectedSubject,
+        activity: selectedSubject === "english" ? selectedMode : selectedActivity,
       });
 
       // Update store with selections
@@ -88,12 +91,17 @@ function StartScreen() {
         child: selectedChild,
         tier: selectedTier,
         mode: selectedMode,
-        subject: "High Frequency Words",
+        subject: selectedSubject,
+        activity: selectedSubject === "english" ? selectedMode : (selectedActivity as any),
       });
 
       // Navigate to session screen after a brief delay to ensure store update
       setTimeout(() => {
-        navigate("/session");
+        if (selectedSubject === "math") {
+          navigate("/math-session");
+        } else {
+          navigate("/session");
+        }
       }, 100);
     }
   };
@@ -226,9 +234,53 @@ function StartScreen() {
               color: "black",
             }}
           >
-            Select Tier
+            Select Subject
           </h2>
           <div
+            style={{
+              display: "flex",
+              justifyContent: "space-around",
+              marginBottom: "2rem",
+            }}
+          >
+            {(["english", "math"] as const).map((subj) => (
+              <button
+                key={subj}
+                onClick={() => setSelectedSubject(subj)}
+                style={{
+                  padding: "1.5rem 1rem",
+                  fontSize: "1.5rem",
+                  fontWeight: "700",
+                  background:
+                    selectedSubject === subj
+                      ? "linear-gradient(135deg,#6366f1 0%,#4f46e5 100%)"
+                      : "linear-gradient(135deg,#6b7280 0%,#4b5563 100%)",
+                  color: selectedSubject === subj ? "white" : "#6b7280",
+                  border:
+                    selectedSubject === subj
+                      ? "3px solid #4f46e5"
+                      : "3px solid #6b7280",
+                  borderRadius: "16px",
+                  cursor: "pointer",
+                  transition: "all 300ms ease",
+                }}
+              >
+                {subj === "english" ? "📚 English" : "🔢 Math"}
+              </button>
+            ))}
+          </div>
+
+          <h2
+            style={{
+              fontSize: "2.5rem",
+              marginBottom: "2rem",
+              color: "black",
+            }}
+          >
+            {selectedSubject === "english" ? "Select Tier" : "Select Activity"}
+          </h2>
+          {selectedSubject === "english" && (
+            <div
             style={{
               display: "flex",
               justifyContent: "space-around",
@@ -335,9 +387,56 @@ function StartScreen() {
                 </div>
               )}
             </div>
-          </div>
+            </div>
+          )}
 
-          <h2
+          {selectedSubject === "math" && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "1rem",
+                justifyContent: "center",
+                marginBottom: "2rem",
+              }}
+            >
+              {[
+                { key: "addition-0-10", label: "➕ Addition" },
+                { key: "counting-by-2s", label: "2️⃣ Count by 2s" },
+                { key: "counting-by-5s", label: "5️⃣ Count by 5s" },
+                { key: "subtraction-up-to-10", label: "➖ Subtract" },
+                { key: "tens-frame", label: "🔳 Tens Frame" },
+              ].map((act) => (
+                <button
+                  key={act.key}
+                  onClick={() => setSelectedActivity(act.key)}
+                  style={{
+                    padding: "1.25rem 1rem",
+                    fontSize: "1.25rem",
+                    fontWeight: 700,
+                    background:
+                      selectedActivity === act.key
+                        ? "linear-gradient(135deg,#10b981 0%,#059669 100%)"
+                        : "linear-gradient(135deg,#6b7280 0%,#4b5563 100%)",
+                    color: selectedActivity === act.key ? "white" : "#6b7280",
+                    border:
+                      selectedActivity === act.key
+                        ? "3px solid #059669"
+                        : "3px solid #6b7280",
+                    borderRadius: "16px",
+                    cursor: "pointer",
+                    transition: "all 300ms ease",
+                    minWidth: 180,
+                  }}
+                >
+                  {act.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selectedSubject === "english" && (
+            <h2
             style={{
               fontSize: "2.5rem",
               marginBottom: "2rem",
@@ -345,8 +444,10 @@ function StartScreen() {
             }}
           >
             Select Mode
-          </h2>
-          <div
+            </h2>
+          )}
+          {selectedSubject === "english" && (
+            <div
             style={{
               display: "flex",
               justifyContent: "space-around",
@@ -397,7 +498,8 @@ function StartScreen() {
             >
               Sentences
             </button>
-          </div>
+            </div>
+          )}
 
           <button
             onClick={handleStartSession}

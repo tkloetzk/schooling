@@ -1,13 +1,14 @@
 import { create } from "zustand";
-import { Selection, Session, Settings } from "../types";
+import { Selection, Session, Settings, Subject, Activity } from "../types";
 import { dbUtils } from "../database";
 
 // Default values
 const defaultSelection: Selection = {
-  subject: "High Frequency Words",
+  subject: "english",
   child: "Everley",
   tier: 1,
-  mode: "words",
+  mode: "words", // english mode
+  activity: "words", // aligns with mode for english
 };
 
 const defaultSession: Session = {
@@ -53,7 +54,7 @@ export const useAppActions = () => {
     setSelection: (selection: Partial<Selection>) => {
       set((state) => ({
         selection: { ...state.selection, ...selection },
-        session: { ...state.session, queue: [], currentItemId: null }, // Clear session when selection changes
+        session: { ...state.session, queue: [], currentItemId: null },
       }));
     },
 
@@ -100,7 +101,7 @@ export const useAppActions = () => {
     nextItem: async () => {
       // Get fresh state to ensure we have the latest selection
       const currentState = get();
-      const { child, tier, mode } = currentState.selection;
+      const { child, tier, mode, subject, activity } = currentState.selection;
       const { queue } = currentState.session;
 
       console.log("nextItem called with selection:", { child, tier, mode });
@@ -120,17 +121,21 @@ export const useAppActions = () => {
           console.log("🚨 QUEUE MODE - skipping database query");
         } else {
           // Queue is empty, get new items due for review
-          const itemType = mode === "words" ? "word" : "sentence";
-          console.log(
-            `🔍 Loading ${itemType} items for ${child}, tier ${tier}`
-          );
-          console.log("🔍 MODE = ", mode, " ITEMTYPE = ", itemType);
+          let itemType: string;
+          if (subject === "english") {
+            itemType = mode === "words" ? "word" : "sentence";
+          } else {
+            itemType = "math"; // math placeholder items
+          }
+          console.log(`🔍 Loading ${itemType} items for ${child}, tier ${tier}`);
 
           const dueItems = await dbUtils.getDueItems(
             child,
             tier,
             itemType,
-            10 // Get 10 items at a time
+            10,
+            subject,
+            activity
           );
 
           console.log(
@@ -180,6 +185,40 @@ export const useAppActions = () => {
           [child]: [...(state.unlockedTiers[child] || []), tier].sort(),
         },
       }));
+    },
+
+    setSubject: (subject: Subject) => {
+      set((state) => ({
+        selection: {
+          ...state.selection,
+          subject,
+          // reset activity & mode when switching subjects
+          mode: subject === "english" ? state.selection.mode : "words",
+          activity: subject === "english" ? state.selection.mode : "addition-0-10",
+          tier: 1,
+        },
+        session: { ...state.session, queue: [], currentItemId: null },
+      }));
+    },
+
+    setActivity: (activity: Activity, tier?: number) => {
+      set((state) => {
+        const nextTier = (tier ?? state.selection.tier) as 1 | 2;
+        const nextMode =
+          state.selection.subject === "english" &&
+          (activity === "words" || activity === "sentences")
+            ? (activity as "words" | "sentences")
+            : state.selection.mode;
+        return {
+          selection: {
+            ...state.selection,
+            activity,
+            mode: nextMode,
+            tier: nextTier,
+          },
+          session: { ...state.session, queue: [], currentItemId: null },
+        };
+      });
     },
   };
 };

@@ -2,15 +2,32 @@
 
 export type Child = "Everley" | "Presley";
 export type Tier = 1 | 2;
-export type ItemType = "word" | "sentence";
+// Expanded item types: retain existing plus a generic 'math' marker for generated problems
+export type ItemType = "word" | "sentence" | "math";
 export type Mode = "words" | "sentences";
 export type Box = 1 | 2 | 3 | 4 | 5;
+
+// Subjects supported in the app
+export type Subject = "english" | "math";
+
+// English activities map to existing modes
+export type EnglishActivity = "words" | "sentences";
+
+// Math activities (initial set – can expand later)
+export type MathActivity =
+  | "addition-0-10"
+  | "counting-by-2s"
+  | "counting-by-5s"
+  | "subtraction-up-to-10"
+  | "tens-frame";
+
+export type Activity = EnglishActivity | MathActivity;
 
 // Database Item interface
 export interface Item {
   id: string;
-  text: string;
-  type: ItemType;
+  text: string; // For english items the display text; for math seed placeholders; runtime math problems generated separately
+  type: ItemType; // word | sentence | math
   child: Child;
   tier: Tier;
   box: Box;
@@ -18,6 +35,9 @@ export interface Item {
   correct: number;
   incorrect: number;
   lastSeen: number;
+  // New fields (added in schema v2):
+  subject?: Subject; // Defaults to 'english' for legacy seeded items
+  activity?: Activity; // words | sentences | math-* activity keys
 }
 
 // Database Attempt interface
@@ -32,10 +52,11 @@ export interface Attempt {
 
 // App selection state
 export interface Selection {
-  subject: string;
+  subject: Subject; // english | math
   child: Child;
   tier: Tier;
-  mode: Mode;
+  mode: Mode; // Only meaningful when subject==='english'
+  activity: Activity; // Generic activity (mirrors mode for english)
 }
 
 // Session state
@@ -68,6 +89,8 @@ export interface AppActions {
   markAnswer: (itemId: string, correct: boolean) => Promise<void>;
   nextItem: () => Promise<void>;
   unlockTier: (child: Child, tier: Tier) => void;
+  setSubject?: (subject: Subject) => void;
+  setActivity?: (activity: Activity, tier?: Tier) => void;
 }
 
 // Combined store type
@@ -93,4 +116,14 @@ export interface SpeechOptions {
   pitch?: number;
   volume?: number;
   voice?: SpeechSynthesisVoice;
+}
+
+// Math problem representation (generated at runtime, not stored directly – items act as placeholders for scheduling)
+export interface MathProblem {
+  type: "addition" | "subtraction" | "counting" | "tens-frame";
+  operand1?: number;
+  operand2?: number;
+  answer: number;
+  display: string; // Rendered prompt
+  choices: number[]; // Multiple choice answers
 }
