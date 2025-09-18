@@ -1,0 +1,76 @@
+/* App.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Center content and increase font size */
+.session-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  text-align: center;
+}
+
+.session-item {
+  font-size: 4rem; /* Even larger font size for words and sentences */
+  margin-bottom: 2rem;
+}
+
+.session-buttons {
+  margin-top: 2rem;
+}
+
+.session-status {
+  margin-top: 2rem;
+  font-size: 1rem;
+}
+
+/* Larger word/sentence display for kids */
+.word-display {
+  font-size: 10rem; /* Make text way bigger for kids */
+  font-weight: 800;
+  line-height: 1;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  border-radius: 32px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #facc15 100%);
+  border: 8px solid #fbbf24;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  margin: 2rem auto;
+  max-width: 90vw;
+}
+
+/* Larger buttons for kid-friendly touch targets */
+.kid-button {
+  min-height: 120px;
+  font-size: 3rem;
+  font-weight: 700;
+  border-radius: 24px;
+  border-width: 6px;
+  padding: 1.5rem 2rem;
+  margin: 1rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+/* Success button styling */
+.kid-button-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-color: #047857;
+  color: white;
+}
+
+/* Error button styling */
+.kid-button-error {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border-color: #b91c1c;
+  color: white;
+}
