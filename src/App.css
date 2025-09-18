@@ -98,6 +98,29 @@
   box-shadow: 0 10px 25px rgba(220, 38, 38, 0.25);
 }
 
+/* Additional feedback variants */
+.feedback-box-warning {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 4px solid #d97706;
+  color: #92400e;
+  border-radius: 16px;
+  padding: 1.5rem 2rem;
+  font-weight: 700;
+  font-size: 2rem;
+  box-shadow: 0 10px 25px rgba(217, 119, 6, 0.25);
+}
+
+.feedback-box-info {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  border: 4px solid #0284c7;
+  color: #075985;
+  border-radius: 16px;
+  padding: 1.5rem 2rem;
+  font-weight: 700;
+  font-size: 2rem;
+  box-shadow: 0 10px 25px rgba(2, 132, 199, 0.25);
+}
+
 button:disabled, .kid-button:disabled {
   opacity: 0.6;
   cursor: not-allowed !important;

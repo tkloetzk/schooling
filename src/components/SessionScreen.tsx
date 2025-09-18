@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Feedback } from "./ui";
 import { useNavigate } from "react-router-dom";
 import { useAppStore, useAppActions } from "../stores";
 import { dbUtils } from "../database";
@@ -326,28 +327,13 @@ const SessionScreen: React.FC<SessionScreenProps> = () => {
 
               {/* Feedback Display */}
               {(lastAnswerStatus || answerFeedback) && (
-                <div
-                  style={{
-                    padding: "2rem",
-                    fontSize: "2rem",
-                    fontWeight: "700",
-                    background:
-                      lastAnswerStatus === "correct"
-                        ? "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)"
-                        : "linear-gradient(135deg, #ffe5e5 0%, #fdcece 100%)",
-                    color:
-                      lastAnswerStatus === "correct" ? "#059669" : "#dc2626",
-                    border:
-                      lastAnswerStatus === "correct"
-                        ? "4px solid #059669"
-                        : "4px solid #dc2626",
-                    borderRadius: "16px",
-                    marginBottom: "1rem",
-                    position: "relative",
-                  }}
-                >
-                  {answerFeedback}
-                </div>
+                <Feedback
+                  variant={lastAnswerStatus === "correct" ? "success" : "error"}
+                  message={answerFeedback}
+                  persist
+                  testId="reading-feedback"
+                  className="mx-auto mb-4"
+                />
               )}
 
               {/* Progress Indicator */}

@@ -11,3 +11,4 @@ export {
 } from "./Card";
 
 export { Container } from "./Container";
+export { Feedback } from "./Feedback";

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { Feedback } from "./ui";
 import { useNavigate } from "react-router-dom";
 import { useAppStore, useAppActions } from "../stores";
 import { dbUtils } from "../database";
@@ -244,48 +245,27 @@ const MathSessionScreen: React.FC = () => {
                 })}
               </div>
               {showFeedback != null && (
-                <div
-                  style={{
-                    fontSize: "2.25rem",
-                    fontWeight: 800,
-                    color: showFeedback ? "#059669" : "#dc2626",
-                    background: showFeedback
-                      ? "linear-gradient(135deg,#d1fae5,#a7f3d0)"
-                      : "linear-gradient(135deg,#ffe5e5,#fdcece)",
-                    border: showFeedback ? "4px solid #059669" : "4px solid #dc2626",
-                    borderRadius: 20,
-                    padding: "1.25rem 2rem",
-                    marginBottom: "1.25rem",
-                  }}
-                >
-                  {showFeedback 
-                    ? "🎉 Correct!" 
-                    : allowRetry 
-                      ? "🤔 Try again!" 
-                      : `� The answer is ${problem.answer}`
+                <Feedback
+                  variant={showFeedback ? "success" : allowRetry ? "warning" : "info"}
+                  message={
+                    showFeedback
+                      ? "🎉 Correct!"
+                      : allowRetry
+                      ? "🤔 Try again!"
+                      : `💡 The answer is ${problem.answer}`
                   }
-                </div>
-              )}
-              {showFeedback === true && (
-                <button
-                  ref={advanceFocusRef}
-                  onClick={handleNextProblem}
-                  disabled={pending}
-                  style={{
-                    padding: "1rem 2rem",
-                    fontSize: "1.5rem",
-                    fontWeight: 700,
-                    background: "linear-gradient(135deg,#6366f1,#4f46e5)",
-                    color: "white",
-                    border: "4px solid #4f46e5",
-                    borderRadius: 16,
-                    cursor: pending ? "wait" : "pointer",
-                    boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
-                    transition: "all 250ms ease",
-                  }}
-                >
-                  Next Question →
-                </button>
+                  action={
+                    showFeedback
+                      ? {
+                          label: "Next Question →",
+                          onClick: handleNextProblem,
+                          disabled: pending,
+                        }
+                      : undefined
+                  }
+                  className="mb-5"
+                  testId="math-feedback"
+                />
               )}
               <div style={{ fontSize: "1.1rem", color: "#6b7280", marginTop: "1.5rem" }}>
                 📊 Items completed: {session.queue.length + 1} / {session.queue.length + 1}
