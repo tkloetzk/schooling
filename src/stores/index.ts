@@ -98,6 +98,27 @@ export const useAppActions = () => {
       }
     },
 
+    // Record an answer but do NOT automatically advance (used for math manual progression)
+    markAnswerNoAdvance: async (itemId: string, correct: boolean) => {
+      const state = get();
+      const { child, tier, mode } = state.selection;
+      try {
+        await dbUtils.updateItemStats(itemId, correct);
+        await dbUtils.recordAttempt(
+          child,
+          tier,
+            itemId,
+            mode === "sentences",
+            correct
+        );
+        // Tier unlock check still applies on correct
+        if (correct) await checkTierUnlocks();
+      } catch (error) {
+        console.error("Failed to mark answer (no advance):", error);
+        throw error;
+      }
+    },
+
     nextItem: async () => {
       // Get fresh state to ensure we have the latest selection
       const currentState = get();

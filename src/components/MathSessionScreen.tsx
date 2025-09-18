@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppStore, useAppActions } from "../stores";
 import { dbUtils } from "../database";
@@ -8,11 +8,15 @@ import { Item } from "../types";
 const MathSessionScreen: React.FC = () => {
   const navigate = useNavigate();
   const { selection, session } = useAppStore();
-  const { markAnswer, nextItem } = useAppActions();
+  const { markAnswer, markAnswerNoAdvance, nextItem } = useAppActions() as any;
   const [currentItem, setCurrentItem] = useState<Item | null>(null);
   const [problemIndex, setProblemIndex] = useState(0);
+  // showFeedback: null = none, true = correct, false = incorrect
   const [showFeedback, setShowFeedback] = useState<null | boolean>(null);
   const [pending, setPending] = useState(false);
+  const [attemptLoggedIncorrect, setAttemptLoggedIncorrect] = useState(false);
+  const [allowRetry, setAllowRetry] = useState(false);
+  const advanceFocusRef = useRef<HTMLButtonElement | null>(null);
 
   // Load current scheduling placeholder item
   useEffect(() => {
@@ -47,23 +51,63 @@ const MathSessionScreen: React.FC = () => {
 
   const handleAnswer = useCallback(
     async (value: number) => {
-      if (!currentItem || problem == null || pending) return;
+      if (!currentItem || problem == null || pending || showFeedback === true) return; // block if already correct
       setPending(true);
       const isCorrect = value === problem.answer;
       setShowFeedback(isCorrect);
+  // mark that an attempt occurred (no separate state needed)
       try {
-        await markAnswer(currentItem.id, isCorrect);
-        // short delay for feedback
-        setTimeout(() => {
+        // Log answer once per incorrect attempt; if incorrect and not yet logged, markAnswer(false)
+        if (!isCorrect) {
+          if (!attemptLoggedIncorrect) {
+            if (markAnswerNoAdvance) {
+              await markAnswerNoAdvance(currentItem.id, false);
+            } else {
+              await markAnswer(currentItem.id, false);
+            }
+            setAttemptLoggedIncorrect(true);
+          }
+          // Allow retry on incorrect without advancing
+          setAllowRetry(true);
           setPending(false);
-        }, 600);
+        } else {
+          // Correct answer: log correct (even if previously incorrect was logged) and allow manual next
+            if (markAnswerNoAdvance) {
+              await markAnswerNoAdvance(currentItem.id, true);
+            } else {
+              await markAnswer(currentItem.id, true);
+            }
+            setAllowRetry(false);
+            setPending(false);
+            // focus next button after small delay for accessibility
+            setTimeout(() => {
+              advanceFocusRef.current?.focus();
+            }, 50);
+        }
       } catch (e) {
         console.error(e);
         setPending(false);
       }
     },
-    [currentItem, problem, markAnswer, pending]
+    [currentItem, problem, pending, showFeedback, attemptLoggedIncorrect, markAnswer]
   );
+
+  const handleNextProblem = useCallback(async () => {
+    if (pending) return;
+    setPending(true);
+    try {
+      await nextItem();
+      // reset local states
+      setShowFeedback(null);
+      setAttemptLoggedIncorrect(false);
+      setAllowRetry(false);
+  // reset attempt-related flags handled by other state
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPending(false);
+    }
+  }, [nextItem, pending]);
 
   const handleBack = () => {
     navigate("/", { state: { preservedSelections: { child: selection.child, tier: selection.tier, mode: selection.mode } } });
@@ -150,34 +194,48 @@ const MathSessionScreen: React.FC = () => {
                 style={{
                   display: "grid",
                   gap: "1.5rem",
-                  gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
+                  gridTemplateColumns: "1fr 1fr",
+                  maxWidth: "400px",
+                  margin: "0 auto",
                   marginBottom: "2rem",
                 }}
               >
-                {problem.choices.map((c) => {
-                  const isChosen = showFeedback != null && c === problem.answer;
-                  const bg =
-                    showFeedback == null
-                      ? "linear-gradient(135deg,#f1f5f9,#e2e8f0)"
-                      : c === problem.answer
-                      ? "linear-gradient(135deg,#34d399,#10b981)"
-                      : "linear-gradient(135deg,#fecaca,#fca5a5)";
+                {problem.choices.map((c, index) => {
+                  const isCorrectChoice = c === problem.answer;
+                  const showAnyFeedback = showFeedback !== null;
+                  const showCorrectHighlight = showFeedback === true || (showFeedback === false && !allowRetry);
+                  
+                  let bg = "linear-gradient(135deg,#f1f5f9,#e2e8f0)";
+                  if (showAnyFeedback) {
+                    if (isCorrectChoice && showCorrectHighlight) {
+                      bg = "linear-gradient(135deg,#34d399,#10b981)";
+                    } else if (showFeedback === false && !showCorrectHighlight) {
+                      bg = "linear-gradient(135deg,#fecaca,#fca5a5)";
+                    }
+                  }
+                  
                   return (
                     <button
-                      key={c}
+                      key={`choice-${index}-${c}`}
                       onClick={() => handleAnswer(c)}
-                      disabled={showFeedback != null}
+                      disabled={pending || (showFeedback === true) || (showFeedback === false && !allowRetry)}
                       style={{
                         padding: "2rem 1rem",
                         fontSize: "2.5rem",
                         fontWeight: 800,
                         borderRadius: 24,
                         border: "6px solid rgba(0,0,0,0.1)",
-                        cursor: showFeedback == null ? "pointer" : "default",
+                        cursor: pending ? "wait" : "pointer",
                         background: bg,
-                        color: isChosen ? "white" : "#1f2937",
+                        color: isCorrectChoice && showCorrectHighlight ? "white" : "#1f2937",
                         boxShadow: "0 12px 30px rgba(0,0,0,0.1)",
-                        transition: "all 300ms ease",
+                        transition: "all 250ms ease",
+                        opacity: pending ? 0.7 : 1,
+                        minHeight: "80px",
+                        minWidth: "120px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
                     >
                       {c}
@@ -197,10 +255,37 @@ const MathSessionScreen: React.FC = () => {
                     border: showFeedback ? "4px solid #059669" : "4px solid #dc2626",
                     borderRadius: 20,
                     padding: "1.25rem 2rem",
+                    marginBottom: "1.25rem",
                   }}
                 >
-                  {showFeedback ? "🎉 Correct!" : "💪 Keep Trying!"}
+                  {showFeedback 
+                    ? "🎉 Correct!" 
+                    : allowRetry 
+                      ? "🤔 Try again!" 
+                      : `� The answer is ${problem.answer}`
+                  }
                 </div>
+              )}
+              {showFeedback === true && (
+                <button
+                  ref={advanceFocusRef}
+                  onClick={handleNextProblem}
+                  disabled={pending}
+                  style={{
+                    padding: "1rem 2rem",
+                    fontSize: "1.5rem",
+                    fontWeight: 700,
+                    background: "linear-gradient(135deg,#6366f1,#4f46e5)",
+                    color: "white",
+                    border: "4px solid #4f46e5",
+                    borderRadius: 16,
+                    cursor: pending ? "wait" : "pointer",
+                    boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+                    transition: "all 250ms ease",
+                  }}
+                >
+                  Next Question →
+                </button>
               )}
               <div style={{ fontSize: "1.1rem", color: "#6b7280", marginTop: "1.5rem" }}>
                 📊 Items completed: {session.queue.length + 1} / {session.queue.length + 1}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppStore, useAppActions } from "../stores";
 import { dbUtils } from "../database";
@@ -10,10 +10,11 @@ const SessionScreen: React.FC<SessionScreenProps> = () => {
   const { selection, session } = useAppStore();
   const { markAnswer, nextItem } = useAppActions();
   const [currentItem, setCurrentItem] = useState<any>(null);
-  const [lastAnswerStatus, setLastAnswerStatus] = useState<
-    "correct" | "incorrect" | null
-  >(null);
+  // Feedback state: persists correct styling and allows temporary lockout to prevent double clicks
+  const [lastAnswerStatus, setLastAnswerStatus] = useState<"correct" | "incorrect" | null>(null);
   const [answerFeedback, setAnswerFeedback] = useState<string>("");
+  const [interactionLocked, setInteractionLocked] = useState(false);
+  const lockTimerRef = useRef<number | null>(null);
   const [sessionStarted, setSessionStarted] = useState(false);
 
   // Load first item when session starts
@@ -44,30 +45,51 @@ const SessionScreen: React.FC<SessionScreenProps> = () => {
   // Handle answer submission (moved before useEffect that uses it)
   const handleAnswer = useCallback(
     async (correct: boolean) => {
-      if (!currentItem) return;
-
+      if (!currentItem || interactionLocked) return;
       try {
-        // Clear previous feedback
-        setLastAnswerStatus(null);
-        setAnswerFeedback("");
+        setInteractionLocked(true);
+        // Ensure any prior timer cleared
+        if (lockTimerRef.current) {
+          window.clearTimeout(lockTimerRef.current);
+        }
 
-        // Mark the answer
         await markAnswer(currentItem.id, correct);
 
-        // Show immediate feedback
         setLastAnswerStatus(correct ? "correct" : "incorrect");
         setAnswerFeedback(correct ? "🎉 Great job!" : "💪 Keep practicing!");
 
-        // Auto-advance after brief delay
-        setTimeout(() => {
-          setLastAnswerStatus(null);
-        }, 1500);
+        // Keep success green (do NOT auto-clear correct). For incorrect, clear after short delay.
+        if (!correct) {
+          lockTimerRef.current = window.setTimeout(() => {
+            setLastAnswerStatus(null);
+            setAnswerFeedback("");
+            setInteractionLocked(false);
+          }, 1000);
+        } else {
+          // For correct answers, brief lockout to prevent double tapping. Advance remains for reading to keep flow.
+          lockTimerRef.current = window.setTimeout(async () => {
+            setInteractionLocked(false);
+            try {
+              await nextItem();
+            } catch (e) {
+              console.error(e);
+            }
+          }, 800);
+        }
       } catch (error) {
         console.error("Failed to handle answer:", error);
+        setInteractionLocked(false);
       }
     },
-    [currentItem, markAnswer]
+    [currentItem, interactionLocked, markAnswer, nextItem]
   );
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (lockTimerRef.current) window.clearTimeout(lockTimerRef.current);
+    };
+  }, []);
 
   // Update current item when session changes
   useEffect(() => {
@@ -94,7 +116,7 @@ const SessionScreen: React.FC<SessionScreenProps> = () => {
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
       // Only handle keyboard events when we have a current item
-      if (!currentItem || lastAnswerStatus) return;
+  if (!currentItem || interactionLocked) return;
 
       // Prevent default browser behavior for arrow keys
       if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
@@ -119,7 +141,7 @@ const SessionScreen: React.FC<SessionScreenProps> = () => {
     return () => {
       window.removeEventListener("keydown", handleKeyPress);
     };
-  }, [currentItem, lastAnswerStatus, handleAnswer]);
+  }, [currentItem, interactionLocked, handleAnswer]);
 
   // Handle back to start - go back but preserve current selections
   const handleBackToStart = () => {
@@ -242,6 +264,7 @@ const SessionScreen: React.FC<SessionScreenProps> = () => {
                 {/* Left button = Left arrow = TRY AGAIN (incorrect) */}
                 <button
                   onClick={() => handleAnswer(false)}
+                  disabled={interactionLocked}
                   style={{
                     padding: "3rem 2rem",
                     fontSize: "2.5rem",
@@ -255,13 +278,14 @@ const SessionScreen: React.FC<SessionScreenProps> = () => {
                     boxShadow: "0 12px 30px rgba(255,107,107,0.3)",
                     transition: "all 300ms ease",
                     transform: "scale(1)",
+                    opacity: interactionLocked ? 0.6 : 1,
                   }}
                   onMouseEnter={(e) =>
-                    !lastAnswerStatus &&
+                    !interactionLocked &&
                     (e.currentTarget.style.transform = "scale(1.05)")
                   }
                   onMouseLeave={(e) =>
-                    !lastAnswerStatus &&
+                    !interactionLocked &&
                     (e.currentTarget.style.transform = "scale(1)")
                   }
                 >
@@ -271,6 +295,7 @@ const SessionScreen: React.FC<SessionScreenProps> = () => {
                 {/* Right button = Right arrow = GOT IT (correct) */}
                 <button
                   onClick={() => handleAnswer(true)}
+                  disabled={interactionLocked}
                   style={{
                     padding: "3rem 2rem",
                     fontSize: "2.5rem",
@@ -280,17 +305,18 @@ const SessionScreen: React.FC<SessionScreenProps> = () => {
                     color: "white",
                     border: "6px solid #40c057",
                     borderRadius: "24px",
-                    cursor: "pointer",
+                    cursor: interactionLocked ? "not-allowed" : "pointer",
                     transition: "all 300ms ease",
                     boxShadow: "0 12px 30px rgba(81,207,102,0.3)",
                     transform: "scale(1)",
+                    opacity: interactionLocked ? 0.6 : 1,
                   }}
                   onMouseEnter={(e) =>
-                    !lastAnswerStatus &&
+                    !interactionLocked &&
                     (e.currentTarget.style.transform = "scale(1.05)")
                   }
                   onMouseLeave={(e) =>
-                    !lastAnswerStatus &&
+                    !interactionLocked &&
                     (e.currentTarget.style.transform = "scale(1)")
                   }
                 >
@@ -317,6 +343,7 @@ const SessionScreen: React.FC<SessionScreenProps> = () => {
                         : "4px solid #dc2626",
                     borderRadius: "16px",
                     marginBottom: "1rem",
+                    position: "relative",
                   }}
                 >
                   {answerFeedback}

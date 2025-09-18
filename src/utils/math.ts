@@ -30,7 +30,7 @@ function generateAddition(idx: number): MathProblem {
     operand2: b,
     answer,
     display: `${a} + ${b} = ?`,
-    choices: buildChoices(answer),
+    choices: buildChoices(answer, idx),
   };
 }
 
@@ -44,7 +44,7 @@ function generateSubtraction(idx: number): MathProblem {
     operand2: b,
     answer,
     display: `${a} - ${b} = ?`,
-    choices: buildChoices(answer),
+    choices: buildChoices(answer, idx),
   };
 }
 
@@ -56,7 +56,7 @@ function generateCounting(idx: number, step: number): MathProblem {
     type: "counting",
     answer,
     display: `${seq.join(", ")}, ?`,
-    choices: buildChoices(answer),
+    choices: buildChoices(answer, idx),
   };
 }
 
@@ -66,7 +66,7 @@ function generateTensFrame(idx: number): MathProblem {
     type: "tens-frame",
     answer: number,
     display: formatTensFrame(number),
-    choices: buildChoices(number),
+    choices: buildChoices(number, idx),
   };
 }
 
@@ -77,16 +77,23 @@ function formatTensFrame(n: number): string {
   return `How many dots?\n${frame}`;
 }
 
-function buildChoices(correct: number): number[] {
+function buildChoices(correct: number, seed: number = 0): number[] {
   const set = new Set<number>();
   set.add(correct);
   const spread = [1, 2, 3];
   let i = 0;
   while (set.size < 4) {
     const delta = spread[i % spread.length];
-    const candidate = (Math.random() > 0.5 ? correct + delta : correct - delta);
+    const candidate = (seed + i) % 2 === 0 ? correct + delta : correct - delta;
     if (candidate >= 0 && candidate <= 20) set.add(candidate);
     i++;
   }
-  return Array.from(set).sort(() => Math.random() - 0.5);
+  // Use deterministic shuffle based on seed instead of Math.random()
+  const choices = Array.from(set);
+  const shuffled = [...choices];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = (seed + i) % (i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }

@@ -87,6 +87,7 @@ export interface AppActions {
   setSession: (session: Partial<Session>) => void;
   setSettings: (settings: Partial<Settings>) => void;
   markAnswer: (itemId: string, correct: boolean) => Promise<void>;
+  markAnswerNoAdvance?: (itemId: string, correct: boolean) => Promise<void>;
   nextItem: () => Promise<void>;
   unlockTier: (child: Child, tier: Tier) => void;
   setSubject?: (subject: Subject) => void;
@@ -126,4 +127,11 @@ export interface MathProblem {
   answer: number;
   display: string; // Rendered prompt
   choices: number[]; // Multiple choice answers
+}
+
+// UI Feedback (lightweight optional types for consistency across screens)
+export type FeedbackStatus = "correct" | "incorrect" | null;
+export interface FeedbackState {
+  status: FeedbackStatus;
+  message: string;
 }
