@@ -219,6 +219,40 @@ export const dbUtils = {
     };
   },
 
+  // Debug function to check what math items exist
+  async debugMathItems(): Promise<void> {
+    const allItems = await db.items.toArray();
+    const mathItems = allItems.filter(item => item.subject === "math");
+
+    console.log(`🔍 Total items in database: ${allItems.length}`);
+    console.log(`🔢 Math items found: ${mathItems.length}`);
+
+    if (mathItems.length > 0) {
+      console.log(`📊 Math items breakdown:`, mathItems.slice(0, 5).map(item => ({
+        id: item.id,
+        child: item.child,
+        tier: item.tier,
+        subject: item.subject,
+        activity: item.activity,
+        type: item.type
+      })));
+
+      // Check distribution by child and activity
+      const byChild = mathItems.reduce((acc, item) => {
+        acc[item.child] = (acc[item.child] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const byActivity = mathItems.reduce((acc, item) => {
+        acc[item.activity || 'undefined'] = (acc[item.activity || 'undefined'] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      console.log(`👥 Math items by child:`, byChild);
+      console.log(`🎯 Math items by activity:`, byActivity);
+    }
+  },
+
   // Export all data as JSON
   async exportData(): Promise<string> {
     const items = await db.items.toArray();
@@ -308,12 +342,20 @@ async function seedDatabase(): Promise<void> {
 }
 
 // Seed initial math placeholder items (used only for scheduling; problem content generated dynamically)
-async function seedMathItems(): Promise<void> {
+export async function seedMathItems(): Promise<void> {
   const mathItems: Item[] = [];
 
-  const pushItem = (child: Child, tier: Tier, activity: Activity, index: number, label: string) => {
+  const pushItem = async (child: Child, tier: Tier, activity: Activity, index: number, label: string) => {
+    const id = `${child}-${tier}-math-${activity}-${index}`;
+
+    // Check if item already exists
+    const existing = await db.items.get(id);
+    if (existing) {
+      return; // Skip if already exists
+    }
+
     mathItems.push({
-      id: `${child}-${tier}-math-${activity}-${index}`,
+      id,
       text: label, // not displayed directly for generated problems
       type: "math",
       child,
@@ -330,24 +372,28 @@ async function seedMathItems(): Promise<void> {
 
   // Addition 0-10 problems (roughly 36 unique pairs) for both children
   for (let i = 0; i < 36; i++) {
-    pushItem("Everley", 1, "addition-0-10", i, `addition-${i}`);
-    pushItem("Presley", 1, "addition-0-10", i, `addition-${i}`);
+    await pushItem("Everley", 1, "addition-0-10", i, `addition-${i}`);
+    await pushItem("Presley", 1, "addition-0-10", i, `addition-${i}`);
   }
 
-  // Counting by 2s & 5s for Presley (tier 1)
+  // Counting by 2s & 5s for both children (tier 1)
   for (let i = 0; i < 20; i++) {
-    pushItem("Presley", 1, "counting-by-2s", i, `count2s-${i}`);
-    pushItem("Presley", 1, "counting-by-5s", i, `count5s-${i}`);
+    await pushItem("Everley", 1, "counting-by-2s", i, `count2s-${i}`);
+    await pushItem("Presley", 1, "counting-by-2s", i, `count2s-${i}`);
+    await pushItem("Everley", 1, "counting-by-5s", i, `count5s-${i}`);
+    await pushItem("Presley", 1, "counting-by-5s", i, `count5s-${i}`);
   }
 
-  // Subtraction up to 10 for Presley (tier 2)
+  // Subtraction up to 10 for both children (tier 1)
   for (let i = 0; i < 30; i++) {
-    pushItem("Presley", 2, "subtraction-up-to-10", i, `sub-${i}`);
+    await pushItem("Everley", 1, "subtraction-up-to-10", i, `sub-${i}`);
+    await pushItem("Presley", 1, "subtraction-up-to-10", i, `sub-${i}`);
   }
 
-  // Tens frame for Everley (tier 1)
+  // Tens frame for both children (tier 1)
   for (let i = 0; i < 10; i++) {
-    pushItem("Everley", 1, "tens-frame", i, `tens-${i}`);
+    await pushItem("Everley", 1, "tens-frame", i, `tens-${i}`);
+    await pushItem("Presley", 1, "tens-frame", i, `tens-${i}`);
   }
 
   if (mathItems.length) {

@@ -246,7 +246,13 @@ function StartScreen() {
             {(["english", "math"] as const).map((subj) => (
               <button
                 key={subj}
-                onClick={() => setSelectedSubject(subj)}
+                onClick={() => {
+                  setSelectedSubject(subj);
+                  // Math only has tier 1 items, so set tier to 1 when selecting math
+                  if (subj === "math") {
+                    setSelectedTier(1);
+                  }
+                }}
                 style={{
                   padding: "1.5rem 1rem",
                   fontSize: "1.5rem",

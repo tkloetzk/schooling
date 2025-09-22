@@ -272,8 +272,37 @@ const MathSessionScreen: React.FC = () => {
               </div>
             </>
           ) : (
-            <div style={{ fontSize: "2rem", fontWeight: 600, color: "#4b5563" }}>
-              {session.loading ? "Loading..." : "🎉 Session complete!"}
+            <div style={{ fontSize: "2rem", fontWeight: 600, color: "#4b5563", textAlign: "center" }}>
+              {session.loading ? (
+                "Loading..."
+              ) : !currentItem ? (
+                <div>
+                  <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🚧</div>
+                  <div style={{ fontSize: "1.5rem", color: "#6b7280", marginBottom: "1rem" }}>
+                    No math problems available!
+                  </div>
+                  <div style={{ fontSize: "1rem", color: "#9ca3af", marginBottom: "2rem" }}>
+                    The database might need to be reseeded with math items.
+                  </div>
+                  <button
+                    onClick={() => window.location.reload()}
+                    style={{
+                      padding: "1rem 2rem",
+                      fontSize: "1.2rem",
+                      fontWeight: 600,
+                      background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                      color: "white",
+                      border: "3px solid #4f46e5",
+                      borderRadius: 16,
+                      cursor: "pointer",
+                    }}
+                  >
+                    🔄 Reload Page
+                  </button>
+                </div>
+              ) : (
+                "🎉 Session complete!"
+              )}
             </div>
           )}
         </div>

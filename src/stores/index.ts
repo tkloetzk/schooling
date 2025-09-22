@@ -143,16 +143,18 @@ export const useAppActions = () => {
         } else {
           // Queue is empty, get new items due for review
           let itemType: string;
+          let queryTier = tier;
           if (subject === "english") {
             itemType = mode === "words" ? "word" : "sentence";
           } else {
             itemType = "math"; // math placeholder items
+            queryTier = 1; // Math items are only available in tier 1
           }
-          console.log(`🔍 Loading ${itemType} items for ${child}, tier ${tier}`);
+          console.log(`🔍 Loading ${itemType} items for ${child}, tier ${queryTier}, subject: ${subject}, activity: ${activity}`);
 
           const dueItems = await dbUtils.getDueItems(
             child,
-            tier,
+            queryTier,
             itemType,
             10,
             subject,
@@ -174,8 +176,38 @@ export const useAppActions = () => {
             newQueue = dueItems.slice(1).map((item) => item.id);
           } else {
             console.warn(
-              `No ${itemType} items found for ${child}, tier ${tier}`
+              `No ${itemType} items found for ${child}, tier ${queryTier}, subject: ${subject}, activity: ${activity}`
             );
+
+            // Special handling for math: try to reseed if no items found
+            if (subject === "math") {
+              console.log("🔄 No math items found, attempting to reseed...");
+              try {
+                const { seedMathItems } = await import("../database");
+                await seedMathItems();
+                console.log("✅ Math items reseeded, retrying query...");
+
+                // Retry the query after reseeding
+                const retryItems = await dbUtils.getDueItems(
+                  child,
+                  queryTier,
+                  itemType,
+                  10,
+                  subject,
+                  activity
+                );
+
+                if (retryItems.length > 0) {
+                  nextItemId = retryItems[0].id;
+                  newQueue = retryItems.slice(1).map((item) => item.id);
+                  console.log("✅ Found math items after reseed:", retryItems.length);
+                } else {
+                  console.error("❌ Still no math items found after reseed");
+                }
+              } catch (reseedError) {
+                console.error("Failed to reseed math items:", reseedError);
+              }
+            }
           }
         }
 
@@ -264,6 +296,33 @@ export const initializeApp = async () => {
     await checkTierUnlocks();
   } catch (error) {
     console.error("Failed to initialize app:", error);
+    throw error;
+  }
+};
+
+// Helper function to add missing math items without clearing existing data
+export const addMissingMathItems = async () => {
+  try {
+    console.log("🔄 Adding missing math items...");
+    // This will only add items that don't already exist
+    const { seedMathItems } = await import("../database");
+    await seedMathItems();
+    console.log("✅ Missing math items added successfully!");
+  } catch (error) {
+    console.error("Failed to add missing math items:", error);
+    throw error;
+  }
+};
+
+// Helper function to force reseed database (DANGER: deletes all data!)
+export const forceReseedDatabase = async () => {
+  try {
+    console.log("🚨 WARNING: Clearing ALL data and reseeding database...");
+    await dbUtils.clearAll();
+    await dbUtils.initialize();
+    console.log("✅ Database reseeded successfully!");
+  } catch (error) {
+    console.error("Failed to reseed database:", error);
     throw error;
   }
 };

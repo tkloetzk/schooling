@@ -67,14 +67,9 @@ const SessionScreen: React.FC<SessionScreenProps> = () => {
             setInteractionLocked(false);
           }, 1000);
         } else {
-          // For correct answers, brief lockout to prevent double tapping. Advance remains for reading to keep flow.
-          lockTimerRef.current = window.setTimeout(async () => {
+          // For correct answers, brief lockout to prevent double tapping. markAnswer already advanced, so just unlock.
+          lockTimerRef.current = window.setTimeout(() => {
             setInteractionLocked(false);
-            try {
-              await nextItem();
-            } catch (e) {
-              console.error(e);
-            }
           }, 800);
         }
       } catch (error) {
