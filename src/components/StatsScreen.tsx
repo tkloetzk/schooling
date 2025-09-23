@@ -1,245 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { dbUtils } from "../database";
-import { Child, Tier, Item } from "../types";
+import { seedData } from "../utils/seedData";
+import { Child, Tier, Item, Subject } from "../types";
 import { Button } from "./ui/Button";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/Card";
 import { Container } from "./ui/Container";
-
-// Import seed data for auto-population
-const SEED_DATA = {
-  Everley: {
-    tier1: {
-      words: [
-        "the",
-        "of",
-        "and",
-        "a",
-        "to",
-        "in",
-        "is",
-        "you",
-        "that",
-        "it",
-        "he",
-        "was",
-        "for",
-        "on",
-        "are",
-        "I",
-        "we",
-        "see",
-        "look",
-        "at",
-        "like",
-        "can",
-        "my",
-        "she",
-        "go",
-        "up",
-        "me",
-        "am",
-        "no",
-        "so",
-      ],
-      sentences: [
-        "I see the cat.",
-        "We look at the sun.",
-        "It is a red bus.",
-        "He can go to the map.",
-        "She was on the log.",
-        "You are in the van.",
-        "I like my hat.",
-        "That dog is in a pen.",
-        "It is a cup of milk.",
-        "We can go to the park.",
-        "The hen and the pig are in a pen.",
-        "It is for me.",
-        "Look at my dad.",
-        "You and I can see it.",
-        "He was at the top.",
-        "We are on a bus.",
-        "She can go in it.",
-        "We look for a bug.",
-      ],
-    },
-    tier2: {
-      words: [
-        "so",
-        "do",
-        "an",
-        "am",
-        "no",
-        "up",
-        "me",
-        "come",
-        "yes",
-        "play",
-        "as",
-        "with",
-        "his",
-        "they",
-        "be",
-        "this",
-        "have",
-        "from",
-      ],
-      sentences: [
-        "I am at the bus.",
-        "Can you come with me?",
-        "Yes we can play.",
-        "They go up the hill.",
-        "Do we have a map?",
-        "This is an ant.",
-        "His hat is on the bed.",
-        "I have no pen.",
-        "Be on the mat.",
-        "We play as we go.",
-        "I got a pen from dad.",
-        "It is so fun.",
-        "He and she come up.",
-        "They are with his cat.",
-        "This can be for me.",
-        "Yes they have it.",
-        "I am up at the top.",
-        "No I do this.",
-      ],
-    },
-  },
-  Presley: {
-    tier1: {
-      words: [
-        "that",
-        "then",
-        "if",
-        "but",
-        "as",
-        "of",
-        "them",
-        "with",
-        "will",
-        "all",
-        "her",
-        "us",
-        "did",
-        "get",
-        "was",
-        "his",
-        "from",
-        "be",
-      ],
-      sentences: [
-        "That dog can run.",
-        "If it is hot, sit.",
-        "We run then rest.",
-        "I like cats but not bees.",
-        "He is as tall as dad.",
-        "All of us can help.",
-        "I will play with you.",
-        "Give it to her.",
-        "We see them here.",
-        "He sat with his dog.",
-        "We will get the ball.",
-        "She was on her bed.",
-        "His hat is red.",
-        "I got it from Sam.",
-        "Be on the mat.",
-        "That was his hat.",
-        "She did all that.",
-        "Come with us to play.",
-      ],
-    },
-    tier2: {
-      words: [
-        "they",
-        "back",
-        "each",
-        "first",
-        "want",
-        "this",
-        "have",
-        "jump",
-        "little",
-        "went",
-        "by",
-        "what",
-        "were",
-        "when",
-        "your",
-        "going",
-        "called",
-        "has",
-        "boy",
-        "girl",
-        "him",
-        "said",
-        "there",
-        "put",
-        "or",
-        "more",
-        "other",
-        "here",
-        "now",
-        "down",
-        "out",
-        "about",
-        "make",
-        "made",
-        "came",
-        "time",
-        "write",
-        "read",
-        "saw",
-        "one",
-        "use",
-        "some",
-        "these",
-        "would",
-        "could",
-        "away",
-        "may",
-        "day",
-        "way",
-        "eat",
-        "because",
-        "been",
-        "than",
-        "too",
-        "two",
-        "who",
-        "find",
-        "very",
-        "many",
-        "off",
-      ],
-      sentences: [
-        "They went back.",
-        "Each kid went first.",
-        "They were here first.",
-        "I want this and have that.",
-        "The little frogs jump.",
-        "Sit by me when your mom is here.",
-        "He is going to a game called Tag.",
-        "The boy said the girl will help him.",
-        "Put it there or get more.",
-        "The other kids are here now.",
-        "Go down and out to read about ants.",
-        "We made it on time.",
-        "She came at one.",
-        "We read and write each day.",
-        "Use these to make some art for one pal.",
-        "We would go if we could.",
-        "May we go away?",
-        "We eat each day this way because mom said so.",
-        "It has been more than two days, too.",
-        "Who can find the very big box?",
-        "Many are off.",
-        "What did you see?",
-        "I saw them at the park.",
-      ],
-    },
-  },
-};
 
 interface StatsScreenProps {}
 
@@ -249,6 +15,9 @@ interface StatsData {
   accuracy: number;
   boxDistribution: number[];
   totalItems: number;
+  attendedItems?: number;
+  unattendedItems?: number;
+  tierLocked?: boolean;
 }
 
 // Tooltip component for showing words/phrases in each box
@@ -357,6 +126,8 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
   const navigate = useNavigate();
   const [selectedChild, setSelectedChild] = useState<Child>("Everley");
   const [selectedTier, setSelectedTier] = useState<Tier>(1);
+  const [selectedSubject, setSelectedSubject] = useState<Subject>("english");
+  const [excludeUnattended, setExcludeUnattended] = useState<boolean>(false);
   const [stats, setStats] = useState<StatsData | null>(null);
   const [hardestItems, setHardestItems] = useState<ItemWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -369,6 +140,7 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
 
   const children: Child[] = ["Everley", "Presley"];
   const tiers: Tier[] = [1, 2];
+  const subjects: Subject[] = ["english", "math"];
 
   // Manual seed function for testing/debugging
   const seedDatabase = async () => {
@@ -377,17 +149,10 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
       const counts = await dbUtils.getItemCounts();
       console.log(`📊 Found ${counts.total} items in database`);
 
-      if (counts.total > 0) {
-        alert(
-          `Database already has ${counts.total} items. Clear data first if needed.`
-        );
-        return;
-      }
-
       console.log("🚀 Starting manual seeding...");
       let totalSeeded = 0;
 
-      for (const [childKey, childData] of Object.entries(SEED_DATA)) {
+      for (const [childKey, childData] of Object.entries(seedData)) {
         const child = childKey as Child;
         console.log(`👶 Processing ${child}...`);
 
@@ -398,6 +163,14 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
           // Seed words
           for (const word of tierData.words) {
             const itemId = `${child}-${tier}-word-${word.replace(/\s+/g, "-")}`;
+
+            // Check if item already exists
+            const existing = await dbUtils.getItemById(itemId);
+            if (existing) {
+              console.log(`⏭️ Skipping existing word: ${word}`);
+              continue;
+            }
+
             const item = {
               id: itemId,
               text: word,
@@ -409,6 +182,8 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
               correct: 0,
               incorrect: 0,
               lastSeen: 0,
+              subject: "english" as any,
+              activity: "words" as any,
             };
             console.log(`📝 Adding word: ${item.text} -> ${itemId}`);
             await dbUtils.createItem(item);
@@ -418,10 +193,16 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
           // Seed sentences
           for (const sentence of tierData.sentences) {
             const itemId = `${child}-${tier}-sentence-${sentence
-              .toLowerCase()
-              .replace(/[^a-zA-Z0-9\s]/g, "")
               .replace(/\s+/g, "-")
-              .slice(0, 50)}`;
+              .substring(0, 20)}`;
+
+            // Check if item already exists
+            const existing = await dbUtils.getItemById(itemId);
+            if (existing) {
+              console.log(`⏭️ Skipping existing sentence: ${sentence.slice(0, 30)}...`);
+              continue;
+            }
+
             const item = {
               id: itemId,
               text: sentence,
@@ -433,6 +214,8 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
               correct: 0,
               incorrect: 0,
               lastSeen: 0,
+              subject: "english" as any,
+              activity: "sentences" as any,
             };
             console.log(`💬 Adding sentence: ${item.text.slice(0, 30)}...`);
             await dbUtils.createItem(item);
@@ -441,36 +224,89 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
         }
       }
 
-      console.log(`✅ Manually seeded ${totalSeeded} items into database!`);
-      alert(`🎉 Database seeded with ${totalSeeded} words and sentences!`);
+      console.log(`✅ Manually seeded ${totalSeeded} new items into database!`);
+      alert(`🎉 Database seeded with ${totalSeeded} new words and sentences!`);
 
       // Reload stats to show the seeded data
-      await loadStats(selectedChild, selectedTier);
+      await loadStats(selectedChild, selectedTier, selectedSubject, excludeUnattended);
     } catch (error) {
       console.error("Failed to manually seed database:", error);
       alert(`❌ Failed to seed database: ${error}`);
     }
   };
 
-  // Load stats for selected child and tier
-  const loadStats = async (child: Child, tier: Tier) => {
+  // Clean up duplicate items
+  const cleanupDuplicates = async () => {
+    try {
+      console.log("🧹 Starting duplicate cleanup...");
+      const result = await dbUtils.cleanupDuplicates();
+
+      if (result.duplicatesFound > 0) {
+        alert(`🧹 Cleanup complete! Found ${result.duplicatesFound} duplicates, removed ${result.duplicatesRemoved}.`);
+      } else {
+        alert("✨ No duplicates found! Database is clean.");
+      }
+
+      // Reload stats to show updated data
+      await loadStats(selectedChild, selectedTier, selectedSubject, excludeUnattended);
+    } catch (error) {
+      console.error("Failed to clean duplicates:", error);
+      alert(`❌ Failed to clean duplicates: ${error}`);
+    }
+  };
+
+  // Investigate database contents
+  const investigateDatabase = async () => {
+    try {
+      console.log("🔍 Starting database investigation...");
+      const result = await dbUtils.investigateDatabase(selectedChild, selectedTier);
+
+      const message = `🔍 Database Investigation for ${selectedChild} Tier ${selectedTier}:
+
+📊 Total Items: ${result.totalItems}
+
+📈 Breakdown:
+• By Type: ${JSON.stringify(result.breakdown.byType, null, 2)}
+• By Subject: ${JSON.stringify(result.breakdown.bySubject, null, 2)}
+• By Activity: ${JSON.stringify(result.breakdown.byActivity, null, 2)}
+
+🔄 Duplicates: ${result.duplicates.length} different texts with multiple entries
+
+${result.duplicates.length > 0 ?
+  `Top Duplicates:\n${result.duplicates.slice(0, 5).map(d => `• "${d.text}" appears ${d.count} times`).join('\n')}`
+  : 'No duplicates found'}
+
+Check console for detailed output.`;
+
+      alert(message);
+    } catch (error) {
+      console.error("Failed to investigate database:", error);
+      alert(`❌ Failed to investigate database: ${error}`);
+    }
+  };
+
+  // Load stats for selected child, tier and subject
+  const loadStats = async (child: Child, tier: Tier, subject: Subject, excludeUnattended: boolean = false) => {
     try {
       setLoading(true);
 
       // Skip auto-seeding for now - let user manually seed
       console.log("Load stats - skipping auto-seed");
 
-      const statsData = await dbUtils.getStats(child, tier);
+      const statsData = await dbUtils.getStats(child, tier, subject, excludeUnattended);
       setStats(statsData);
 
-      // Load all items for this child/tier to find hardest items
-      const items = await dbUtils.getItemsForSession(child, tier, "word");
-      const sentenceItems = await dbUtils.getItemsForSession(
-        child,
-        tier,
-        "sentence"
-      );
-      const allItems = [...items, ...sentenceItems];
+      // Load all items for this child/tier/subject to find hardest items
+      let allItems: any[] = [];
+
+      if (subject === "english") {
+        const items = await dbUtils.getItemsForSession(child, tier, "word", subject, "words");
+        const sentenceItems = await dbUtils.getItemsForSession(child, tier, "sentence", subject, "sentences");
+        allItems = [...items, ...sentenceItems];
+      } else if (subject === "math") {
+        const mathItems = await dbUtils.getItemsForSession(child, tier, "math", subject);
+        allItems = mathItems;
+      }
 
       // Sort by incorrect attempts (hardest first)
       const sortedItems = allItems
@@ -494,8 +330,8 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
   };
 
   useEffect(() => {
-    loadStats(selectedChild, selectedTier);
-  }, [selectedChild, selectedTier]);
+    loadStats(selectedChild, selectedTier, selectedSubject, excludeUnattended);
+  }, [selectedChild, selectedTier, selectedSubject, excludeUnattended]);
 
   const handleExportData = async () => {
     try {
@@ -560,7 +396,8 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
       const tooltipItems = await dbUtils.getItemsByBox(
         selectedChild,
         selectedTier,
-        box
+        box,
+        selectedSubject
       );
 
       console.log(
@@ -669,11 +506,11 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
           </div>
         </div>
 
-        {/* Child and Tier Selection */}
+        {/* Child, Tier, and Subject Selection */}
         <Card style={{ marginBottom: "2rem" }}>
           <CardHeader>
             <CardTitle style={{ fontSize: "2rem", textAlign: "center" }}>
-              🎯 Select Student & Level
+              🎯 Select Student, Level & Subject
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -734,17 +571,87 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
                   </Button>
                 ))}
               </div>
+
+              {/* Subject Selection */}
+              <div style={{ display: "flex", gap: "1rem" }}>
+                {subjects.map((subject) => (
+                  <Button
+                    key={subject}
+                    onClick={() => setSelectedSubject(subject)}
+                    style={{
+                      padding: "1.5rem 2rem",
+                      fontSize: "1.5rem",
+                      fontWeight: "700",
+                      background:
+                        selectedSubject === subject
+                          ? "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)"
+                          : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
+                      border:
+                        selectedSubject === subject
+                          ? "4px solid #7c3aed"
+                          : "4px solid #6b7280",
+                    }}
+                  >
+                    {subject === "english" ? "📚" : "🔢"} {subject.charAt(0).toUpperCase() + subject.slice(1)}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Filter Options */}
+              <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                <Button
+                  onClick={() => setExcludeUnattended(!excludeUnattended)}
+                  style={{
+                    padding: "1rem 2rem",
+                    fontSize: "1.2rem",
+                    fontWeight: "600",
+                    background: excludeUnattended
+                      ? "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
+                      : "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
+                    border: excludeUnattended
+                      ? "3px solid #dc2626"
+                      : "3px solid #6b7280",
+                  }}
+                >
+                  {excludeUnattended ? "🚫" : "📊"} {excludeUnattended ? "Hide" : "Show"} Unattended Items
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {stats && (
           <>
+            {/* Tier Locked Warning */}
+            {stats.tierLocked && (
+              <Card style={{ marginBottom: "2rem", border: "3px solid #f59e0b" }}>
+                <CardContent>
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "1rem",
+                      background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+                      borderRadius: "8px",
+                      fontSize: "1.2rem",
+                      color: "#92400e",
+                    }}
+                  >
+                    🔒 <strong>Tier {selectedTier} is locked for {selectedChild}</strong>
+                    <br />
+                    <span style={{ fontSize: "1rem" }}>
+                      Complete Tier 1 with 95% accuracy and 75+ attempts to unlock
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Overall Statistics */}
             <Card style={{ marginBottom: "2rem" }}>
               <CardHeader>
                 <CardTitle style={{ fontSize: "2rem", textAlign: "center" }}>
-                  📈 Overall Performance - {selectedChild} Tier {selectedTier}
+                  📈 Overall Performance - {selectedChild} Tier {selectedTier} ({selectedSubject.charAt(0).toUpperCase() + selectedSubject.slice(1)})
+                  {stats.tierLocked && " 🔒"}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -817,8 +724,13 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
                       {stats.totalItems}
                     </div>
                     <div style={{ fontSize: "1.2rem", color: "#6b7280" }}>
-                      Total Words/Phrases
+                      Total {excludeUnattended ? "Attempted" : "Words/Phrases"}
                     </div>
+                    {!excludeUnattended && stats.attendedItems !== undefined && stats.unattendedItems !== undefined && (
+                      <div style={{ fontSize: "0.9rem", color: "#9ca3af", marginTop: "0.5rem" }}>
+                        📚 {stats.attendedItems} attempted, 📝 {stats.unattendedItems} not yet tried
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -1043,11 +955,11 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
               </Card>
             )}
 
-            {/* Database Seeding for Testing */}
+            {/* Database Management */}
             <Card style={{ marginBottom: "2rem" }}>
               <CardHeader>
                 <CardTitle style={{ fontSize: "2rem", textAlign: "center" }}>
-                  🌱 Database Setup (For Testing Tooltips)
+                  🔧 Database Management
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1071,21 +983,46 @@ const StatsScreen: React.FC<StatsScreenProps> = () => {
                       color: "#92400e",
                     }}
                   >
-                    📚 No words in database? Click "Seed Database" below to add
-                    ~80 word and sentence samples for testing!
+                    📚 Manage your database: Add sample data or clean up duplicates
                   </div>
-                  <Button
-                    onClick={seedDatabase}
-                    style={{
-                      padding: "1.5rem 3rem",
-                      fontSize: "1.5rem",
-                      fontWeight: "700",
-                      background:
-                        "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                    }}
-                  >
-                    🌱 Seed Database (Add Sample Words)
-                  </Button>
+                  <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", justifyContent: "center" }}>
+                    <Button
+                      onClick={seedDatabase}
+                      style={{
+                        padding: "1.5rem 2rem",
+                        fontSize: "1.2rem",
+                        fontWeight: "700",
+                        background:
+                          "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      }}
+                    >
+                      🌱 Seed Database
+                    </Button>
+                    <Button
+                      onClick={cleanupDuplicates}
+                      style={{
+                        padding: "1.5rem 2rem",
+                        fontSize: "1.2rem",
+                        fontWeight: "700",
+                        background:
+                          "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                      }}
+                    >
+                      🧹 Clean Duplicates
+                    </Button>
+                    <Button
+                      onClick={investigateDatabase}
+                      style={{
+                        padding: "1.5rem 2rem",
+                        fontSize: "1.2rem",
+                        fontWeight: "700",
+                        background:
+                          "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                      }}
+                    >
+                      🔍 Investigate DB
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -22,7 +22,7 @@ export class AppDatabase extends Dexie {
     this.version(2)
       .stores({
         items:
-          "++id, text, type, subject, activity, child, tier, box, seen, correct, incorrect, lastSeen, [child+tier], [child+tier+type], [child+tier+box], [child+lastSeen], [child+subject+activity], [child+subject+activity+tier]",
+          "id, text, type, subject, activity, child, tier, box, seen, correct, incorrect, lastSeen, [child+tier], [child+tier+type], [child+tier+box], [child+lastSeen], [child+subject+activity], [child+subject+activity+tier]",
         attempts:
           "++ts, child, tier, itemId, isSentence, correct, [child+tier], [child+tier+correct], [child+ts]",
       })
@@ -102,12 +102,20 @@ export const dbUtils = {
   async getItemsByBox(
     child: string,
     tier: number,
-    box: number
+    box: number,
+    subject?: string
   ): Promise<Item[]> {
-    return await db.items
+    let items = await db.items
       .where("[child+tier+box]")
       .equals([child, tier, box])
       .toArray();
+
+    // Filter by subject if specified
+    if (subject) {
+      items = items.filter(item => item.subject === subject);
+    }
+
+    return items;
   },
 
   // Get total item count
@@ -116,9 +124,9 @@ export const dbUtils = {
     return { total };
   },
 
-  // Create a single item
+  // Create a single item (idempotent - won't create duplicates)
   async createItem(item: Item): Promise<void> {
-    await db.items.add(item);
+    await db.items.put(item);
   },
 
   // Get items due for review (lowest box first, then oldest lastSeen)
@@ -190,8 +198,22 @@ export const dbUtils = {
     });
   },
 
-  // Get statistics for a child/tier
-  async getStats(child: string, tier: number) {
+  // Check if a tier is unlocked for a child
+  async isTierUnlocked(child: string, tier: number): Promise<boolean> {
+    // Tier 1 is always unlocked
+    if (tier === 1) return true;
+
+    // For tier 2, check if tier 1 is mastered
+    if (tier === 2) {
+      const tier1Stats = await this.getStatsInternal(child, 1);
+      return tier1Stats.accuracy >= 0.95 && tier1Stats.totalAttempts >= 75;
+    }
+
+    return false;
+  },
+
+  // Internal stats function without tier validation (for tier unlock checking)
+  async getStatsInternal(child: string, tier: number, subject?: string, excludeUnattended: boolean = false) {
     const attempts = await db.attempts
       .where("[child+tier]")
       .equals([child, tier])
@@ -201,12 +223,24 @@ export const dbUtils = {
     const correctAttempts = attempts.filter((a: Attempt) => a.correct).length;
     const accuracy = totalAttempts > 0 ? correctAttempts / totalAttempts : 0;
 
-    const items = await db.items
+    let items = await db.items
       .where("[child+tier]")
       .equals([child, tier])
       .toArray();
 
-    const boxDistribution = [1, 2, 3, 4, 5].map(
+    // Filter by subject if specified
+    if (subject) {
+      items = items.filter(item => item.subject === subject);
+    }
+
+    // Filter out unattended items if requested
+    if (excludeUnattended) {
+      items = items.filter(item => item.seen > 0);
+    }
+
+    // Return box distribution in UI display order: [box5, box4, box3, box2, box1]
+    // This matches the UI which displays [Mastered, Advanced, Progressing, Developing, Beginning]
+    const boxDistribution = [5, 4, 3, 2, 1].map(
       (box) => items.filter((item: Item) => item.box === box).length
     );
 
@@ -216,6 +250,163 @@ export const dbUtils = {
       accuracy,
       boxDistribution,
       totalItems: items.length,
+      attendedItems: items.filter(item => item.seen > 0).length,
+      unattendedItems: items.filter(item => item.seen === 0).length,
+    };
+  },
+
+  // Get statistics for a child/tier/subject (respects tier unlocking)
+  async getStats(child: string, tier: number, subject?: string, excludeUnattended: boolean = false) {
+    // Check if tier is unlocked
+    const isUnlocked = await this.isTierUnlocked(child, tier);
+
+    if (!isUnlocked) {
+      // Return empty stats for locked tiers
+      return {
+        totalAttempts: 0,
+        correctAttempts: 0,
+        accuracy: 0,
+        boxDistribution: [0, 0, 0, 0, 0],
+        totalItems: 0,
+        attendedItems: 0,
+        unattendedItems: 0,
+        tierLocked: true,
+      };
+    }
+
+    const stats = await this.getStatsInternal(child, tier, subject, excludeUnattended);
+    return {
+      ...stats,
+      tierLocked: false,
+    };
+  },
+
+  // Clean up duplicate items in database
+  async cleanupDuplicates(): Promise<{ duplicatesFound: number; duplicatesRemoved: number }> {
+    const allItems = await db.items.toArray();
+
+    // Group items by their unique text+child+tier+type combination
+    const itemGroups = new Map<string, Item[]>();
+
+    for (const item of allItems) {
+      const key = `${item.text}-${item.child}-${item.tier}-${item.type}`;
+      if (!itemGroups.has(key)) {
+        itemGroups.set(key, []);
+      }
+      itemGroups.get(key)!.push(item);
+    }
+
+    let duplicatesFound = 0;
+    let duplicatesRemoved = 0;
+    const itemsToRemove: string[] = [];
+
+    // Find duplicates and keep the one with the most progress
+    for (const [key, items] of itemGroups) {
+      if (items.length > 1) {
+        duplicatesFound += items.length - 1;
+
+        // Sort by progress (box level, then seen count)
+        items.sort((a, b) => {
+          if (a.box !== b.box) return b.box - a.box; // Higher box first
+          if (a.seen !== b.seen) return b.seen - a.seen; // More seen first
+          return b.correct - a.correct; // More correct first
+        });
+
+        // Keep the first (most progressed), remove the rest
+        for (let i = 1; i < items.length; i++) {
+          itemsToRemove.push(items[i].id);
+        }
+      }
+    }
+
+    // Remove duplicates
+    if (itemsToRemove.length > 0) {
+      await db.items.bulkDelete(itemsToRemove);
+      duplicatesRemoved = itemsToRemove.length;
+    }
+
+    console.log(`🧹 Cleanup complete: Found ${duplicatesFound} duplicates, removed ${duplicatesRemoved}`);
+
+    return { duplicatesFound, duplicatesRemoved };
+  },
+
+  // Investigate database contents for a specific child/tier
+  async investigateDatabase(child?: string, tier?: number): Promise<{
+    totalItems: number;
+    breakdown: Record<string, any>;
+    duplicates: Array<{ text: string; count: number; ids: string[] }>;
+    samples: Item[];
+  }> {
+    const allItems = await db.items.toArray();
+
+    // Filter by child/tier if specified
+    const filteredItems = allItems.filter(item =>
+      (!child || item.child === child) &&
+      (!tier || item.tier === tier)
+    );
+
+    console.log(`🔍 Database Investigation for ${child || 'ALL'} Tier ${tier || 'ALL'}:`);
+    console.log(`📊 Total items found: ${filteredItems.length}`);
+
+    // Breakdown by various categories
+    const breakdown = {
+      byChild: filteredItems.reduce((acc, item) => {
+        acc[item.child] = (acc[item.child] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+
+      byTier: filteredItems.reduce((acc, item) => {
+        acc[item.tier] = (acc[item.tier] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+
+      byType: filteredItems.reduce((acc, item) => {
+        acc[item.type] = (acc[item.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+
+      bySubject: filteredItems.reduce((acc, item) => {
+        acc[item.subject || 'undefined'] = (acc[item.subject || 'undefined'] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+
+      byActivity: filteredItems.reduce((acc, item) => {
+        acc[item.activity || 'undefined'] = (acc[item.activity || 'undefined'] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+    };
+
+    // Find duplicates by text content
+    const textGroups = new Map<string, Item[]>();
+    for (const item of filteredItems) {
+      const key = item.text.toLowerCase().trim();
+      if (!textGroups.has(key)) {
+        textGroups.set(key, []);
+      }
+      textGroups.get(key)!.push(item);
+    }
+
+    const duplicates = Array.from(textGroups.entries())
+      .filter(([_, items]) => items.length > 1)
+      .map(([text, items]) => ({
+        text,
+        count: items.length,
+        ids: items.map(item => item.id)
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    console.log(`📈 Breakdown:`, breakdown);
+    console.log(`🔄 Duplicates found: ${duplicates.length} different texts with multiple entries`);
+
+    if (duplicates.length > 0) {
+      console.log(`📋 Top duplicates:`, duplicates.slice(0, 10));
+    }
+
+    return {
+      totalItems: filteredItems.length,
+      breakdown,
+      duplicates,
+      samples: filteredItems.slice(0, 10)
     };
   },
 
@@ -299,8 +490,16 @@ async function seedDatabase(): Promise<void> {
 
       // Add words
       for (const word of tierData.words) {
+        const itemId = `${childName}-${tier}-word-${word.replace(/\s+/g, "-")}`;
+
+        // Check if item already exists
+        const existing = await db.items.get(itemId);
+        if (existing) {
+          continue; // Skip if already exists
+        }
+
         items.push({
-          id: `${childName}-${tier}-word-${word.replace(/\s+/g, "-")}`,
+          id: itemId,
           text: word,
           type: "word",
           child: childName as Child,
@@ -317,10 +516,18 @@ async function seedDatabase(): Promise<void> {
 
       // Add sentences
       for (const sentence of tierData.sentences) {
+        const itemId = `${childName}-${tier}-sentence-${sentence
+          .replace(/\s+/g, "-")
+          .substring(0, 20)}`;
+
+        // Check if item already exists
+        const existing = await db.items.get(itemId);
+        if (existing) {
+          continue; // Skip if already exists
+        }
+
         items.push({
-          id: `${childName}-${tier}-sentence-${sentence
-            .replace(/\s+/g, "-")
-            .substring(0, 20)}`,
+          id: itemId,
           text: sentence,
           type: "sentence",
           child: childName as Child,
@@ -337,8 +544,12 @@ async function seedDatabase(): Promise<void> {
     }
   }
 
-  await db.items.bulkAdd(items);
-  console.log(`Seeded database with ${items.length} items`);
+  if (items.length > 0) {
+    await db.items.bulkPut(items);
+    console.log(`Seeded database with ${items.length} new items`);
+  } else {
+    console.log("No new items to seed - all items already exist");
+  }
 }
 
 // Seed initial math placeholder items (used only for scheduling; problem content generated dynamically)
