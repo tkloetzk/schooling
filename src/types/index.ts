@@ -78,7 +78,7 @@ export interface AppState {
   selection: Selection;
   session: Session;
   settings: Settings;
-  unlockedTiers: Record<Child, Tier[]>;
+  unlockedTiers: Record<Child, Record<Subject, Tier[]>>;
 }
 
 // Actions for the store
@@ -89,7 +89,7 @@ export interface AppActions {
   markAnswer: (itemId: string, correct: boolean) => Promise<void>;
   markAnswerNoAdvance?: (itemId: string, correct: boolean) => Promise<void>;
   nextItem: () => Promise<void>;
-  unlockTier: (child: Child, tier: Tier) => void;
+  unlockTier: (child: Child, subject: Subject, tier: Tier) => void;
   setSubject?: (subject: Subject) => void;
   setActivity?: (activity: Activity, tier?: Tier) => void;
 }

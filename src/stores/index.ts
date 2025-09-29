@@ -23,9 +23,15 @@ const defaultSettings: Settings = {
   voice: undefined,
 };
 
-const defaultUnlockedTiers: Record<string, number[]> = {
-  Everley: [1], // Start with only tier 1 unlocked for proper tier gating
-  Presley: [1], // Start with only tier 1 unlocked for proper tier gating
+const defaultUnlockedTiers: Record<string, Record<string, number[]>> = {
+  Everley: {
+    english: [1],
+    math: [1],
+  },
+  Presley: {
+    english: [1],
+    math: [1],
+  },
 };
 
 // Store interface
@@ -231,13 +237,21 @@ export const useAppActions = () => {
       }
     },
 
-    unlockTier: (child: string, tier: number) => {
-      set((state) => ({
-        unlockedTiers: {
-          ...state.unlockedTiers,
-          [child]: [...(state.unlockedTiers[child] || []), tier].sort(),
-        },
-      }));
+    unlockTier: (child: string, subject: Subject, tier: number) => {
+      set((state) => {
+        const currentChildTiers = state.unlockedTiers[child] || { english: [1], math: [1] };
+        const currentSubjectTiers = currentChildTiers[subject] || [1];
+
+        return {
+          unlockedTiers: {
+            ...state.unlockedTiers,
+            [child]: {
+              ...currentChildTiers,
+              [subject]: [...currentSubjectTiers, tier].filter((t, i, arr) => arr.indexOf(t) === i).sort(),
+            },
+          },
+        };
+      });
     },
 
     setSubject: (subject: Subject) => {
@@ -333,15 +347,17 @@ const checkTierUnlocks = async () => {
   const actions = useAppActions();
 
   for (const child of ["Everley", "Presley"] as const) {
-    // Check Tier 1 mastery for Tier 2 unlock
-    if (!store.unlockedTiers[child]?.includes(2)) {
-      const tier1Stats = await dbUtils.getStats(child, 1);
+    for (const subject of ["english", "math"] as const) {
+      // Check Tier 1 mastery for Tier 2 unlock per subject
+      if (!store.unlockedTiers[child]?.[subject]?.includes(2)) {
+        const tier1Stats = await dbUtils.getStats(child, 1, subject);
 
-      // Require "fully successful" - high accuracy AND substantial practice
-      // This ensures the child has truly mastered tier 1 before advancing
-      if (tier1Stats.accuracy >= 0.95 && tier1Stats.totalAttempts >= 75) {
-        console.log(`🎉 ${child} has mastered Tier 1! Unlocking Tier 2.`);
-        actions.unlockTier(child, 2);
+        // Require "fully successful" - high accuracy AND substantial practice
+        // This ensures the child has truly mastered tier 1 before advancing
+        if (tier1Stats.accuracy >= 0.95 && tier1Stats.totalAttempts >= 75) {
+          console.log(`🎉 ${child} has mastered ${subject} Tier 1! Unlocking ${subject} Tier 2.`);
+          actions.unlockTier(child, subject, 2);
+        }
       }
     }
   }

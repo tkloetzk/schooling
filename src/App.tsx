@@ -63,10 +63,10 @@ function StartScreen() {
   setSelectedSubject("english");
   };
 
-  // Check if tier is unlocked for selected child
+  // Check if tier is unlocked for selected child and subject
   const isTierUnlocked = (tier: 1 | 2) => {
     if (!selectedChild) return true;
-    return unlockedTiers[selectedChild]?.includes(tier) || false;
+    return unlockedTiers[selectedChild]?.[selectedSubject]?.includes(tier) || false;
   };
 
   const handleTierSelect = (tier: 1 | 2) => {

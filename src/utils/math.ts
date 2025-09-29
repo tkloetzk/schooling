@@ -22,7 +22,8 @@ export function generateMathProblem(activity: MathActivity, index: number): Math
 
 function generateAddition(idx: number): MathProblem {
   const a = randFromIndex(idx * 7, 11); // 0-10
-  const b = randFromIndex(idx * 13 + 3, 11);
+  const maxB = Math.min(10 - a, 10); // ensure a + b <= 10
+  const b = randFromIndex(idx * 13 + 3, maxB + 1);
   const answer = a + b;
   return {
     type: "addition",

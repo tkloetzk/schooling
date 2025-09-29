@@ -198,14 +198,14 @@ export const dbUtils = {
     });
   },
 
-  // Check if a tier is unlocked for a child
-  async isTierUnlocked(child: string, tier: number): Promise<boolean> {
+  // Check if a tier is unlocked for a child and subject
+  async isTierUnlocked(child: string, tier: number, subject?: string): Promise<boolean> {
     // Tier 1 is always unlocked
     if (tier === 1) return true;
 
-    // For tier 2, check if tier 1 is mastered
+    // For tier 2, check if tier 1 is mastered for the specific subject
     if (tier === 2) {
-      const tier1Stats = await this.getStatsInternal(child, 1);
+      const tier1Stats = await this.getStatsInternal(child, 1, subject);
       return tier1Stats.accuracy >= 0.95 && tier1Stats.totalAttempts >= 75;
     }
 
@@ -257,8 +257,8 @@ export const dbUtils = {
 
   // Get statistics for a child/tier/subject (respects tier unlocking)
   async getStats(child: string, tier: number, subject?: string, excludeUnattended: boolean = false) {
-    // Check if tier is unlocked
-    const isUnlocked = await this.isTierUnlocked(child, tier);
+    // Check if tier is unlocked (pass subject for subject-specific checking)
+    const isUnlocked = await this.isTierUnlocked(child, tier, subject);
 
     if (!isUnlocked) {
       // Return empty stats for locked tiers
