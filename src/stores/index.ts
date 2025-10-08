@@ -93,6 +93,12 @@ export const useAppActions = () => {
           correct
         );
 
+        // Auto-backup after every 10th attempt
+        const attempts = await dbUtils.getStats(child, tier);
+        if (attempts.totalAttempts % 10 === 0) {
+          await dbUtils.autoBackupToStorage();
+        }
+
         // Move to next item
         await nextItem();
 
@@ -117,6 +123,13 @@ export const useAppActions = () => {
             mode === "sentences",
             correct
         );
+
+        // Auto-backup after every 10th attempt
+        const attempts = await dbUtils.getStats(child, tier);
+        if (attempts.totalAttempts % 10 === 0) {
+          await dbUtils.autoBackupToStorage();
+        }
+
         // Tier unlock check still applies on correct
         if (correct) await checkTierUnlocks();
       } catch (error) {
@@ -308,10 +321,36 @@ export const initializeApp = async () => {
 
     // Check for tier unlocks based on progress
     await checkTierUnlocks();
+
+    // Create initial auto-backup
+    await dbUtils.autoBackupToStorage();
   } catch (error) {
     console.error("Failed to initialize app:", error);
     throw error;
   }
+};
+
+// Backup and restore utilities
+export const backupUtils = {
+  // Download backup file to Downloads folder
+  downloadBackup: async () => {
+    await dbUtils.downloadBackup();
+  },
+
+  // Restore from a file upload
+  restoreFromFile: async (file: File) => {
+    await dbUtils.restoreFromFile(file);
+  },
+
+  // Restore from auto-backup in localStorage
+  restoreFromAutoBackup: async (index: number = 0) => {
+    await dbUtils.restoreFromStorage(index);
+  },
+
+  // Manually trigger auto-backup
+  createAutoBackup: async () => {
+    await dbUtils.autoBackupToStorage();
+  },
 };
 
 // Helper function to add missing math items without clearing existing data
@@ -352,9 +391,9 @@ const checkTierUnlocks = async () => {
       if (!store.unlockedTiers[child]?.[subject]?.includes(2)) {
         const tier1Stats = await dbUtils.getStats(child, 1, subject);
 
-        // Require "fully successful" - high accuracy AND substantial practice
-        // This ensures the child has truly mastered tier 1 before advancing
-        if (tier1Stats.accuracy >= 0.95 && tier1Stats.totalAttempts >= 75) {
+        // Require 80% accuracy with substantial practice (75+ attempts)
+        // This allows progression without requiring perfect mastery
+        if (tier1Stats.accuracy >= 0.80 && tier1Stats.totalAttempts >= 75) {
           console.log(`🎉 ${child} has mastered ${subject} Tier 1! Unlocking ${subject} Tier 2.`);
           actions.unlockTier(child, subject, 2);
         }

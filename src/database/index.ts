@@ -2,6 +2,16 @@ import Dexie, { Table } from "dexie";
 import { Item, Attempt, SeedData, Subject, Activity, Child, Tier } from "../types";
 import { seedData } from "../utils/seedData";
 
+// Spaced repetition constants
+// Maps box level to interval in days: [1→1, 2→3, 3→7, 4→14, 5→30]
+export const BOX_TO_INTERVAL_DAYS: Record<number, number> = {
+  1: 1,
+  2: 3,
+  3: 7,
+  4: 14,
+  5: 30
+};
+
 // Database class extending Dexie
 export class AppDatabase extends Dexie {
   items!: Table<Item>;
@@ -10,10 +20,10 @@ export class AppDatabase extends Dexie {
   constructor() {
     super("HighFrequencyWordsDB");
 
-    // v1: original schema
+    // v1: original schema (using string IDs, not auto-increment)
     this.version(1).stores({
       items:
-        "++id, text, type, child, tier, box, seen, correct, incorrect, lastSeen, [child+tier], [child+tier+type], [child+tier+box], [child+lastSeen]",
+        "id, text, type, child, tier, box, seen, correct, incorrect, lastSeen, [child+tier], [child+tier+type], [child+tier+box], [child+lastSeen]",
       attempts:
         "++ts, child, tier, itemId, isSentence, correct, [child+tier], [child+tier+correct], [child+ts]",
     });
@@ -40,6 +50,39 @@ export class AppDatabase extends Dexie {
         }
         await table.bulkPut(all);
       });
+
+    // v3: add spaced repetition fields (nextReview, interval) via upgrade function
+    // No schema changes needed - fields are stored but not indexed
+    this.version(3)
+      .stores({
+        items:
+          "id, text, type, subject, activity, child, tier, box, seen, correct, incorrect, lastSeen, [child+tier], [child+tier+type], [child+tier+box], [child+lastSeen], [child+subject+activity], [child+subject+activity+tier]",
+        attempts:
+          "++ts, child, tier, itemId, isSentence, correct, [child+tier], [child+tier+correct], [child+ts]",
+      })
+      .upgrade(async (tx) => {
+        const table = tx.table<Item>("items");
+        const all = await table.toArray();
+
+        // Backfill spaced repetition fields
+        for (const item of all) {
+          if (item.nextReview === undefined || item.interval === undefined) {
+            const intervalDays = BOX_TO_INTERVAL_DAYS[item.box] || 1;
+
+            if (item.seen === 0) {
+              // Never seen before - due now
+              (item as any).nextReview = 0;
+              (item as any).interval = 1;
+            } else {
+              // Calculate nextReview based on lastSeen + interval
+              const intervalMs = intervalDays * 24 * 60 * 60 * 1000;
+              (item as any).nextReview = item.lastSeen + intervalMs;
+              (item as any).interval = intervalDays;
+            }
+          }
+        }
+        await table.bulkPut(all);
+      });
   }
 }
 
@@ -60,8 +103,10 @@ export const dbUtils = {
       } else {
         console.log(`Database already has ${itemCount} items - skipping seed`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to initialize database:", error);
+      console.error("⚠️ Database error detected. Your data is preserved.");
+      console.error("💡 Use the backup/restore functions to save your progress.");
       throw error;
     }
   },
@@ -129,7 +174,9 @@ export const dbUtils = {
     await db.items.put(item);
   },
 
-  // Get items due for review (lowest box first, then oldest lastSeen)
+  // Get items due for review using spaced repetition algorithm
+  // Includes cross-tier items (tier 1 non-mastered items when in tier 2)
+  // If no items are due, returns items anyway (sorted by nextReview) to allow on-demand practice
   async getDueItems(
     child: string,
     tier: number,
@@ -138,25 +185,82 @@ export const dbUtils = {
     subject?: Subject,
     activity?: Activity
   ): Promise<Item[]> {
-    let items: Item[];
+    const now = Date.now();
+    let allItems: Item[] = [];
+
+    // Get items for current tier
+    let currentTierItems: Item[];
     if (subject && activity) {
-      items = await db.items
+      currentTierItems = await db.items
         .where("[child+subject+activity+tier]")
         .equals([child, subject, activity, tier])
         .toArray();
     } else {
-      items = await db.items
+      currentTierItems = await db.items
         .where("[child+tier+type]")
         .equals([child, tier, type])
         .toArray();
     }
 
-    return items
-      .sort((a, b) => a.box - b.box || a.lastSeen - b.lastSeen)
+    // Filter to items that are due (nextReview <= now or nextReview is null/undefined)
+    const dueCurrentTierItems = currentTierItems.filter(item =>
+      !item.nextReview || item.nextReview <= now
+    );
+
+    allItems.push(...dueCurrentTierItems);
+
+    // If tier 2, also include tier 1 non-mastered items (box < 5) for the same subject/activity
+    if (tier === 2 && subject && activity) {
+      const tier1Items = await db.items
+        .where("[child+subject+activity+tier]")
+        .equals([child, subject, activity, 1])
+        .toArray();
+
+      // Filter to non-mastered items that are due
+      const dueTier1Items = tier1Items.filter(item =>
+        item.box < 5 && (!item.nextReview || item.nextReview <= now)
+      );
+
+      allItems.push(...dueTier1Items);
+    }
+
+    // Deduplicate by id (in case of any edge cases)
+    let uniqueItems = Array.from(
+      new Map(allItems.map(item => [item.id, item])).values()
+    );
+
+    // If no due items found, fallback to all items (sorted by nextReview)
+    // This allows on-demand practice even when nothing is due
+    if (uniqueItems.length === 0) {
+      uniqueItems = currentTierItems;
+
+      // For tier 2, also include tier 1 non-mastered items
+      if (tier === 2 && subject && activity) {
+        const tier1Items = await db.items
+          .where("[child+subject+activity+tier]")
+          .equals([child, subject, activity, 1])
+          .toArray();
+
+        uniqueItems = [...uniqueItems, ...tier1Items.filter(item => item.box < 5)];
+      }
+
+      // Deduplicate again
+      uniqueItems = Array.from(
+        new Map(uniqueItems.map(item => [item.id, item])).values()
+      );
+    }
+
+    // Sort by nextReview (earliest first, treat null/undefined as 0)
+    return uniqueItems
+      .sort((a, b) => {
+        const aReview = a.nextReview || 0;
+        const bReview = b.nextReview || 0;
+        return aReview - bReview;
+      })
       .slice(0, limit);
   },
 
-  // Update item statistics after an attempt
+  // Update item statistics after an attempt with spaced repetition
   async updateItemStats(itemId: string, correct: boolean): Promise<void> {
     const item = await db.items.get(itemId);
     if (!item) return;
@@ -170,11 +274,25 @@ export const dbUtils = {
     if (correct) {
       updates.correct = item.correct + 1;
       // Promote box (max 5)
-      updates.box = Math.min(item.box + 1, 5) as any;
+      const newBox = Math.min(item.box + 1, 5);
+      updates.box = newBox as any;
+
+      // Calculate interval based on new box level
+      const intervalDays = BOX_TO_INTERVAL_DAYS[newBox] || 1;
+      updates.interval = intervalDays;
+
+      // Calculate nextReview timestamp
+      const intervalMs = intervalDays * 24 * 60 * 60 * 1000;
+      updates.nextReview = now + intervalMs;
     } else {
       updates.incorrect = item.incorrect + 1;
       // Demote to box 1
       updates.box = 1;
+      updates.interval = 1;
+
+      // Schedule for review in 1 day
+      const intervalMs = 1 * 24 * 60 * 60 * 1000;
+      updates.nextReview = now + intervalMs;
     }
 
     await db.items.update(itemId, updates);
@@ -203,10 +321,10 @@ export const dbUtils = {
     // Tier 1 is always unlocked
     if (tier === 1) return true;
 
-    // For tier 2, check if tier 1 is mastered for the specific subject
+    // For tier 2, check if tier 1 is mastered for the specific subject (80% accuracy threshold)
     if (tier === 2) {
       const tier1Stats = await this.getStatsInternal(child, 1, subject);
-      return tier1Stats.accuracy >= 0.95 && tier1Stats.totalAttempts >= 75;
+      return tier1Stats.accuracy >= 0.80 && tier1Stats.totalAttempts >= 75;
     }
 
     return false;
@@ -467,15 +585,96 @@ export const dbUtils = {
       const data = JSON.parse(jsonData);
 
       if (data.items && Array.isArray(data.items)) {
-        await db.items.bulkAdd(data.items);
+        await db.items.bulkPut(data.items);
       }
 
       if (data.attempts && Array.isArray(data.attempts)) {
-        await db.attempts.bulkAdd(data.attempts);
+        await db.attempts.bulkPut(data.attempts);
       }
+
+      console.log("✅ Data imported successfully!");
     } catch (error) {
       console.error("Failed to import data:", error);
       throw new Error("Invalid data format");
+    }
+  },
+
+  // Download backup as a file
+  async downloadBackup(): Promise<void> {
+    try {
+      const jsonData = await this.exportData();
+      const blob = new Blob([jsonData], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `schooling-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      console.log("✅ Backup downloaded successfully!");
+    } catch (error) {
+      console.error("Failed to download backup:", error);
+      throw error;
+    }
+  },
+
+  // Restore from uploaded file
+  async restoreFromFile(file: File): Promise<void> {
+    try {
+      const text = await file.text();
+      await this.importData(text);
+      console.log("✅ Data restored successfully!");
+    } catch (error) {
+      console.error("Failed to restore from file:", error);
+      throw error;
+    }
+  },
+
+  // Auto-backup to localStorage (limited but survives cache clears better)
+  async autoBackupToStorage(): Promise<void> {
+    try {
+      const jsonData = await this.exportData();
+      const timestamp = Date.now();
+
+      // Keep last 3 backups
+      const backups = [];
+      for (let i = 0; i < 3; i++) {
+        const key = `schooling-backup-${i}`;
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          backups.push({ key, data: existing, timestamp: JSON.parse(existing).exportDate });
+        }
+      }
+
+      // Add new backup and remove oldest if needed
+      localStorage.setItem('schooling-backup-0', jsonData);
+      if (backups.length >= 3) {
+        localStorage.removeItem('schooling-backup-2');
+      }
+
+      console.log("✅ Auto-backup saved to localStorage");
+    } catch (error) {
+      console.error("Failed to auto-backup:", error);
+      // Don't throw - auto-backup failures shouldn't break the app
+    }
+  },
+
+  // Restore from localStorage backup
+  async restoreFromStorage(index: number = 0): Promise<void> {
+    try {
+      const key = `schooling-backup-${index}`;
+      const jsonData = localStorage.getItem(key);
+
+      if (!jsonData) {
+        throw new Error("No backup found in storage");
+      }
+
+      await this.importData(jsonData);
+      console.log("✅ Data restored from localStorage!");
+    } catch (error) {
+      console.error("Failed to restore from storage:", error);
+      throw error;
     }
   },
 };
@@ -511,6 +710,8 @@ async function seedDatabase(): Promise<void> {
           lastSeen: 0,
           subject: "english",
           activity: "words",
+          nextReview: 0,
+          interval: 1,
         });
       }
 
@@ -539,6 +740,8 @@ async function seedDatabase(): Promise<void> {
           lastSeen: 0,
           subject: "english",
           activity: "sentences",
+          nextReview: 0,
+          interval: 1,
         });
       }
     }
@@ -578,6 +781,8 @@ export async function seedMathItems(): Promise<void> {
       lastSeen: 0,
       subject: "math",
       activity,
+      nextReview: 0,
+      interval: 1,
     });
   };
 

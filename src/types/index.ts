@@ -38,6 +38,9 @@ export interface Item {
   // New fields (added in schema v2):
   subject?: Subject; // Defaults to 'english' for legacy seeded items
   activity?: Activity; // words | sentences | math-* activity keys
+  // New fields (added in schema v3 - spaced repetition):
+  nextReview?: number; // Timestamp when item is due for review
+  interval?: number; // Days until next review
 }
 
 // Database Attempt interface

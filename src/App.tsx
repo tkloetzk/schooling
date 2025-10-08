@@ -13,6 +13,7 @@ import StatsScreen from "./components/StatsScreen";
 import AdditionExerciseScreen from "./components/AdditionExerciseScreen";
 import SubtractionExerciseScreen from "./components/SubtractionExerciseScreen";
 import CountingExerciseScreen from "./components/CountingExerciseScreen";
+import { BackupControls } from "./components/BackupControls";
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
           <Route path="/subtraction" element={<SubtractionExerciseScreen />} />
           <Route path="/counting" element={<CountingExerciseScreen />} />
         </Routes>
+        <BackupControls />
       </div>
     </Router>
   );
