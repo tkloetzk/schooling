@@ -51,10 +51,12 @@ export const Feedback: React.FC<FeedbackProps> = ({
       data-testid={testId}
       role={ariaRole}
       aria-live={persist ? "polite" : "assertive"}
+      onClick={action && !action.disabled ? action.onClick : undefined}
       className={cn(
         "feedback-component rounded-2xl font-bold shadow-md flex flex-col items-center gap-4",
         variantStyles[variant],
         sizeStyles[size],
+        action && !action.disabled && "cursor-pointer",
         className
       )}
     >

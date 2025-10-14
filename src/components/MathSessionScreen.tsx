@@ -114,6 +114,39 @@ const MathSessionScreen: React.FC = () => {
     navigate("/", { state: { preservedSelections: { child: selection.child, tier: selection.tier, mode: selection.mode } } });
   };
 
+  // Handle keyboard input for number answers
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (!problem || pending) return;
+
+      // Handle spacebar to advance after correct answer
+      if (e.key === " " || e.key === "Spacebar") {
+        if (showFeedback === true) {
+          e.preventDefault(); // Prevent page scroll
+          handleNextProblem();
+        }
+        return;
+      }
+
+      // Don't allow number input after correct answer
+      if (showFeedback === true) return;
+
+      // Check if a number key was pressed (0-9)
+      const key = e.key;
+      if (/^\d$/.test(key)) {
+        const typedNumber = parseInt(key, 10);
+
+        // Check if the typed number is one of the available choices
+        if (problem.choices.includes(typedNumber)) {
+          handleAnswer(typedNumber);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [problem, pending, showFeedback, handleAnswer, handleNextProblem]);
+
   return (
     <div
       style={{
